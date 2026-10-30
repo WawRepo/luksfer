@@ -71,6 +71,7 @@ enum MainMenu {
             item("Up One Folder", #selector(BrowserWindowController.goUp(_:)), functionKey(NSUpArrowFunctionKey)),
             .separator(),
             item("Go to Path…", #selector(BrowserWindowController.editPath(_:)), "l"),
+            item("Add Network Drive…", #selector(BrowserWindowController.addNetworkDrive(_:)), "k"),
             .separator(),
             item("Home", #selector(BrowserWindowController.goHome(_:)), "h", [.command, .shift]),
             item("Desktop", #selector(BrowserWindowController.goDesktop(_:)), "d", [.command, .shift]),

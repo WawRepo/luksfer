@@ -5,18 +5,28 @@ protocol SidebarDelegate: AnyObject {
     func sidebar(_ sidebar: SidebarViewController, open url: URL)
     func sidebar(_ sidebar: SidebarViewController, openInOtherPane url: URL)
     func sidebar(_ sidebar: SidebarViewController, drop urls: [URL], into folder: URL, operation: DropOperation) -> Bool
+    func sidebar(_ sidebar: SidebarViewController, connect drive: NetworkDrive)
+    func sidebar(_ sidebar: SidebarViewController, edit drive: NetworkDrive)
+    func sidebar(_ sidebar: SidebarViewController, remove drive: NetworkDrive)
+    func sidebarAddNetworkDrive(_ sidebar: SidebarViewController)
 }
 
-/// One row of the sidebar. Group rows have a `section`; the others have a `url`.
+/// One row of the sidebar. Group rows have a `section`; the others have a `url`, or a `drive`
+/// that is not connected yet.
 final class SidebarNode: NSObject {
-    enum Section: String { case favorites = "Favorites", thisMac = "This Mac", locations = "Locations" }
+    enum Section: String { case favorites = "Favorites", thisMac = "This Mac", locations = "Locations", network = "Network" }
+
+    static let networkSymbol = "externaldrive.connected.to.line.below"
 
     let section: Section?
     let title: String
     let url: URL?
     let symbol: String
     let favoriteIndex: Int?
-    let ejectable: Bool
+    /// The volume the Eject button unmounts; nil for rows without the button.
+    let ejectURL: URL?
+    /// A saved network drive; `url` is nil while it is not connected.
+    let drive: NetworkDrive?
     var children: [SidebarNode] = []
 
     init(section: Section) {
@@ -25,20 +35,32 @@ final class SidebarNode: NSObject {
         url = nil
         symbol = ""
         favoriteIndex = nil
-        ejectable = false
+        ejectURL = nil
+        drive = nil
     }
 
-    init(title: String, url: URL, symbol: String, favoriteIndex: Int? = nil, ejectable: Bool = false) {
+    init(title: String, url: URL, symbol: String, favoriteIndex: Int? = nil, ejectURL: URL? = nil) {
         section = nil
         self.title = title
         self.url = url
         self.symbol = symbol
         self.favoriteIndex = favoriteIndex
-        self.ejectable = ejectable
+        self.ejectURL = ejectURL
+        drive = nil
+    }
+
+    init(drive: NetworkDrive, folder: URL?, mountPoint: URL?) {
+        section = nil
+        title = drive.name
+        url = folder
+        symbol = Self.networkSymbol
+        favoriteIndex = nil
+        ejectURL = mountPoint
+        self.drive = drive
     }
 }
 
-/// The sidebar: Favorites (pin, reorder, rename, unpin), This Mac, and Locations (PRD §6.4).
+/// The sidebar: Favorites (pin, reorder, rename, unpin), This Mac, Locations and Network (PRD §6.4).
 final class SidebarViewController: NSViewController {
     weak var delegate: SidebarDelegate?
     let outline = NSOutlineView()
@@ -103,16 +125,28 @@ final class SidebarViewController: NSViewController {
             SidebarNode(title: "Pictures", url: home.appendingPathComponent("Pictures", isDirectory: true), symbol: "photo"),
         ] + CloudPlaces.providers().map { SidebarNode(title: $0.0, url: $0.1, symbol: "cloud") }
 
+        let mounts = NetworkMount.current()
         let locations = SidebarNode(section: .locations)
         let root = URL(fileURLWithPath: "/", isDirectory: true)
         locations.children = [
             SidebarNode(title: root.displayName, url: root, symbol: "internaldrive"),
             SidebarNode(title: "Applications", url: URL(fileURLWithPath: "/Applications", isDirectory: true), symbol: "square.grid.2x2"),
-        ] + externalVolumes() + [
+        ] + externalVolumes(skipping: mounts) + [
             SidebarNode(title: "Trash", url: home.appendingPathComponent(".Trash", isDirectory: true), symbol: "trash"),
         ]
 
-        groups = [favorites, mac, locations]
+        // Saved drives first, then network volumes mounted some other way (in Finder, for example).
+        let network = SidebarNode(section: .network)
+        let drives = NetworkDrives.shared
+        network.children = drives.drives.map { drive in
+            let mount = drives.mount(of: drive, in: mounts)
+            let folder = mount.flatMap { m in drive.smb.map { m.folder(for: $0) } }
+            return SidebarNode(drive: drive, folder: folder, mountPoint: mount?.mountPoint)
+        } + drives.otherMounts(in: mounts).map {
+            SidebarNode(title: $0.mountPoint.lastPathComponent, url: $0.mountPoint, symbol: SidebarNode.networkSymbol, ejectURL: $0.mountPoint)
+        }
+
+        groups = [favorites, mac, locations, network]
         outline.reloadData()
         let collapsed = Set(AppServices.shared.settings.collapsedSidebarSections)
         for g in groups {
@@ -121,15 +155,18 @@ final class SidebarViewController: NSViewController {
         if let currentFolder { highlight(currentFolder) }
     }
 
-    private func externalVolumes() -> [SidebarNode] {
+    /// Local volumes under /Volumes. Network volumes go to the Network section; they are skipped
+    /// before any volume value is read, because reading one can wait for a server that went away.
+    private func externalVolumes(skipping network: [NetworkMount]) -> [SidebarNode] {
         let keys: [URLResourceKey] = [.volumeLocalizedNameKey, .volumeIsInternalKey, .volumeIsEjectableKey, .volumeIsRemovableKey, .volumeIsRootFileSystemKey]
-        let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) ?? []
+        let skip = Set(network.map(\.mountPoint.standardizedFileURL.path))
+        let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: nil, options: [.skipHiddenVolumes]) ?? []
         return urls.compactMap { url in
-            guard let v = try? url.resourceValues(forKeys: Set(keys)), v.volumeIsRootFileSystem != true,
-                  url.path.hasPrefix("/Volumes/") else { return nil }
+            guard url.path.hasPrefix("/Volumes/"), !skip.contains(url.standardizedFileURL.path),
+                  let v = try? url.resourceValues(forKeys: Set(keys)), v.volumeIsRootFileSystem != true else { return nil }
             let ejectable = (v.volumeIsEjectable ?? false) || (v.volumeIsRemovable ?? false) || !(v.volumeIsInternal ?? true)
             return SidebarNode(title: v.volumeLocalizedName ?? url.lastPathComponent, url: url,
-                               symbol: ejectable ? "externaldrive" : "internaldrive", ejectable: ejectable)
+                               symbol: ejectable ? "externaldrive" : "internaldrive", ejectURL: ejectable ? url : nil)
         }
     }
 
@@ -157,14 +194,33 @@ final class SidebarViewController: NSViewController {
     // MARK: Actions
 
     @objc private func clicked() {
-        guard let node = outline.item(atRow: outline.clickedRow) as? SidebarNode, let url = node.url else { return }
-        delegate?.sidebar(self, open: url)
+        guard let node = outline.item(atRow: outline.clickedRow) as? SidebarNode else { return }
+        open(node)
+    }
+
+    /// Opens the folder of the row; a network drive that is not connected connects first.
+    private func open(_ node: SidebarNode) {
+        if let url = node.url { delegate?.sidebar(self, open: url) } else if let drive = node.drive { delegate?.sidebar(self, connect: drive) }
     }
 
     private func clickedNode() -> SidebarNode? { outline.item(atRow: outline.clickedRow) as? SidebarNode }
 
     @objc private func openClicked(_ sender: NSMenuItem) {
-        if let url = (sender.representedObject as? SidebarNode)?.url { delegate?.sidebar(self, open: url) }
+        if let node = sender.representedObject as? SidebarNode { open(node) }
+    }
+
+    @objc private func addNetworkDrive(_ sender: Any?) { delegate?.sidebarAddNetworkDrive(self) }
+
+    @objc private func editDrive(_ sender: NSMenuItem) {
+        if let drive = (sender.representedObject as? SidebarNode)?.drive { delegate?.sidebar(self, edit: drive) }
+    }
+
+    @objc private func removeDrive(_ sender: NSMenuItem) {
+        if let drive = (sender.representedObject as? SidebarNode)?.drive { delegate?.sidebar(self, remove: drive) }
+    }
+
+    @objc private func ejectClicked(_ sender: NSMenuItem) {
+        if let url = (sender.representedObject as? SidebarNode)?.ejectURL { eject(url) }
     }
 
     @objc private func openInOtherPane(_ sender: NSMenuItem) {
@@ -226,9 +282,12 @@ final class SidebarViewController: NSViewController {
         }
     }
 
-    @objc private func eject(_ sender: NSButton) {
-        guard let path = sender.cell?.representedObject as? String else { return }
-        let url = URL(fileURLWithPath: path)
+    @objc private func ejectButton(_ sender: NSButton) {
+        if let path = sender.cell?.representedObject as? String { eject(URL(fileURLWithPath: path)) }
+    }
+
+    /// Ejects a disk or disconnects a network volume.
+    private func eject(_ url: URL) {
         DispatchQueue.global().async {
             do { try NSWorkspace.shared.unmountAndEjectDevice(at: url) } catch {
                 DispatchQueue.main.async {
@@ -261,7 +320,8 @@ extension SidebarViewController: NSOutlineViewDataSource, NSOutlineViewDelegate 
     }
 
     func outlineView(_ outlineView: NSOutlineView, shouldSelectItem item: Any) -> Bool {
-        (item as? SidebarNode)?.url != nil
+        guard let node = item as? SidebarNode else { return false }
+        return node.url != nil || node.drive != nil
     }
 
     func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
@@ -276,6 +336,16 @@ extension SidebarViewController: NSOutlineViewDataSource, NSOutlineViewDelegate 
             cell.textField = label
             label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2).isActive = true
             label.centerYAnchor.constraint(equalTo: cell.centerYAnchor).isActive = true
+            if section == .network {
+                let add = NSButton(image: .symbol("plus", "Add network drive", size: 11, weight: .semibold), target: self, action: #selector(addNetworkDrive))
+                add.isBordered = false
+                add.contentTintColor = .controlAccentColor
+                add.toolTip = "Add Network Drive…"
+                add.translatesAutoresizingMaskIntoConstraints = false
+                cell.addSubview(add)
+                add.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -16).isActive = true
+                add.centerYAnchor.constraint(equalTo: cell.centerYAnchor).isActive = true
+            }
             if section == .favorites {
                 let edit = NSButton(title: editingFavorites ? "Done" : "Edit", target: self, action: #selector(toggleEdit))
                 edit.isBordered = false
@@ -294,7 +364,12 @@ extension SidebarViewController: NSOutlineViewDataSource, NSOutlineViewDelegate 
         image.contentTintColor = .controlAccentColor
         let label = NSTextField(labelWithString: node.title)
         label.lineBreakMode = .byTruncatingTail
-        label.toolTip = node.url?.tildePath
+        label.toolTip = node.url?.tildePath ?? node.drive.map { "\($0.address) (not connected; click to connect)" }
+        if node.drive != nil, node.url == nil {
+            label.textColor = .secondaryLabelColor
+            image.contentTintColor = .tertiaryLabelColor
+            label.setAccessibilityValue("Not connected")
+        }
         let stack = NSStackView(views: [image, label])
         stack.spacing = 6
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -311,11 +386,12 @@ extension SidebarViewController: NSOutlineViewDataSource, NSOutlineViewDelegate 
                 b.isEnabled = !(tag == -1 && i == 0) && !(tag == 1 && i == count - 1)
                 stack.addArrangedSubview(b)
             }
-        } else if node.ejectable, let url = node.url {
-            let b = NSButton(image: .symbol("eject.fill", "Eject \(node.title)", size: 11), target: self, action: #selector(eject))
+        } else if let url = node.ejectURL {
+            let network = node.symbol == SidebarNode.networkSymbol
+            let b = NSButton(image: .symbol("eject.fill", "\(network ? "Disconnect" : "Eject") \(node.title)", size: 11), target: self, action: #selector(ejectButton))
             b.isBordered = false
             b.cell?.representedObject = url.path
-            b.toolTip = "Eject"
+            b.toolTip = network ? "Disconnect" : "Eject"
             stack.addArrangedSubview(b)
         }
         cell.addSubview(stack)
@@ -400,17 +476,27 @@ extension SidebarViewController: NSOutlineViewDataSource, NSOutlineViewDelegate 
 extension SidebarViewController: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        guard let node = clickedNode(), node.url != nil else { return }
-        func add(_ title: String, _ action: Selector, tag: Int = 0) {
+        func addItem(_ title: String, _ action: Selector, node: SidebarNode?, tag: Int = 0) {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.target = self
             item.representedObject = node
             item.tag = tag
             menu.addItem(item)
         }
-        add("Open", #selector(openClicked))
-        add("Open in Other Pane", #selector(openInOtherPane))
+        if clickedNode()?.section == .network { addItem("Add Network Drive…", #selector(addNetworkDrive), node: nil) }
+        guard let node = clickedNode(), node.url != nil || node.drive != nil else { return }
+        func add(_ title: String, _ action: Selector, tag: Int = 0) { addItem(title, action, node: node, tag: tag) }
+        add(node.url == nil ? "Connect" : "Open", #selector(openClicked))
+        if node.url != nil { add("Open in Other Pane", #selector(openInOtherPane)) }
         menu.addItem(.separator())
+        if node.symbol == SidebarNode.networkSymbol {
+            if node.ejectURL != nil { add("Disconnect", #selector(ejectClicked)) }
+            if node.drive != nil {
+                add("Edit…", #selector(editDrive))
+                add("Remove from Sidebar…", #selector(removeDrive))
+            }
+            return
+        }
         if let i = node.favoriteIndex {
             add("Rename Label…", #selector(renameFavorite))
             if i > 0 { add("Move Up", #selector(moveFavorite), tag: -1) }

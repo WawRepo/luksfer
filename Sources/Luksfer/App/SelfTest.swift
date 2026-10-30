@@ -343,6 +343,75 @@ enum SelfTest {
     }
 
     /// ⌘N opens a second window.
+    /// Network drives: the dialog, the Keychain and the sidebar. No server runs in the
+    /// test, so the connection fails on purpose. LUKSFER_KEYCHAIN keeps every password in the sandbox.
+    private static func networkDrives(window w: BrowserWindowController) async {
+        guard ProcessInfo.processInfo.environment["LUKSFER_KEYCHAIN"] != nil else {
+            FileHandle.standardError.write(Data("selftest: SKIP network drives (no LUKSFER_KEYCHAIN sandbox keychain)\n".utf8))
+            return
+        }
+        let passwords = NetworkDrives.shared.passwords
+        let secret = "fake-secret-1234"
+        func networkRows() -> [SidebarNode] { w.sidebar.groups.first { $0.section == .network }?.children ?? [] }
+        check("the sidebar has a Network section", w.sidebar.groups.contains { $0.section == .network })
+
+        w.addNetworkDrive(nil)
+        await wait()
+        guard let dialog = NetworkDriveDialog.current else { check("Add Network Drive opens the dialog", false); return }
+        check("Add waits for an address it can read", dialog.alert.buttons.first?.isEnabled == false)
+        dialog.addressField.stringValue = #"\\127.0.0.1:1\Photos"#
+        dialog.validate()
+        check("a Windows address works", dialog.alert.buttons.first?.isEnabled == true && dialog.nameField.placeholderString == "Photos")
+        dialog.userField.stringValue = "tester"
+        dialog.passwordField.stringValue = secret
+        dialog.alert.buttons.first?.performClick(nil)
+        await wait()
+
+        guard let drive = AppServices.shared.settings.networkDrives.first else { check("Add saves the drive", false); return }
+        check("Add saves the drive without the password", drive.address == "smb://127.0.0.1:1/Photos" && drive.user == "tester" && drive.name == "Photos")
+        AppServices.shared.store.saveNow()
+        let saved = (try? String(contentsOf: AppServices.shared.store.fileURL, encoding: .utf8)) ?? ""
+        check("settings.json has no password", saved.contains("127.0.0.1") && !saved.contains(secret))
+        check("the password is in the Keychain", passwords.password(for: drive.id) == secret)
+        check("the sidebar shows the drive", networkRows().contains { $0.drive?.id == drive.id && $0.url == nil })
+        let failed = await waitFor(60) { sheetText(w.window?.attachedSheet?.contentView).contains("could not connect to “Photos”") }
+        check("a server that does not answer gives a clear error, and the window keeps working", failed)
+        _ = await answer("OK", on: w.window)
+        await wait()
+
+        w.editNetworkDrive(drive)
+        await wait()
+        if let edit = NetworkDriveDialog.current {
+            check("Edit never shows the saved password", edit.passwordField.stringValue.isEmpty
+                  && edit.passwordField.placeholderString?.contains("Keychain") == true && edit.userField.stringValue == "tester")
+            edit.passwordField.stringValue = "fake-secret-5678"
+            edit.alert.buttons.first?.performClick(nil)
+            await wait()
+            check("a typed password replaces the saved one", passwords.password(for: drive.id) == "fake-secret-5678")
+        } else {
+            check("Edit opens the dialog", false)
+        }
+
+        w.editNetworkDrive(drive)
+        await wait()
+        NetworkDriveDialog.current?.rememberBox.state = .off
+        NetworkDriveDialog.current?.alert.buttons.first?.performClick(nil)
+        await wait()
+        check("Remember off deletes the saved password", !passwords.hasPassword(for: drive.id))
+        w.connect(drive)
+        await wait()
+        check("without a saved password, Connect asks for it", sheetText(w.window?.attachedSheet?.contentView).contains("Enter the password of “tester”"))
+        _ = await answer("Cancel", on: w.window)
+        await wait()
+
+        try? passwords.setPassword("fake-secret-9", for: drive.id, label: NetworkDrives.keychainLabel(for: drive))
+        w.removeNetworkDrive(drive)
+        check("Remove asks first", await answer("Remove", on: w.window))
+        await wait()
+        check("Remove takes the drive and its password away", AppServices.shared.settings.networkDrives.isEmpty
+              && !passwords.hasPassword(for: drive.id) && !networkRows().contains { $0.drive != nil })
+    }
+
     private static func newWindow() async {
         let before = NSApp.windows.filter { $0.windowController is BrowserWindowController }.count
         (NSApp.delegate as? AppDelegate)?.newWindow(nil)
@@ -478,6 +547,7 @@ enum SelfTest {
         await drops(in: folder, window: w)
         await newWindow()
         await terminal(in: folder, window: w)
+        await networkDrives(window: w)
 
         DevHooks.snapshot(to: folder.deletingLastPathComponent().appendingPathComponent("selftest.png"))
         finish()

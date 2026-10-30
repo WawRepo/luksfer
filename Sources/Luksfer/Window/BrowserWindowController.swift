@@ -307,7 +307,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     func windowDidBecomeKey(_ notification: Notification) { updateToolbar() }
 
-    @objc func stopOperation() { FileActions.shared.cancelCurrent() }
+    @objc func stopOperation() {
+        if FileActions.shared.isBusy {
+            FileActions.shared.cancelCurrent()
+        } else {
+            NetworkDrives.shared.cancelAll()
+            statusBar.hideProgress()
+        }
+    }
 
     private var lastShowHidden: Bool?
 
@@ -402,6 +409,11 @@ extension BrowserWindowController: SidebarDelegate {
         FileActions.shared.transfer(urls, into: folder, operation: operation, in: self)
         return true
     }
+
+    func sidebar(_ sidebar: SidebarViewController, connect drive: NetworkDrive) { connect(drive) }
+    func sidebar(_ sidebar: SidebarViewController, edit drive: NetworkDrive) { editNetworkDrive(drive) }
+    func sidebar(_ sidebar: SidebarViewController, remove drive: NetworkDrive) { removeNetworkDrive(drive) }
+    func sidebarAddNetworkDrive(_ sidebar: SidebarViewController) { addNetworkDrive(nil) }
 }
 
 // MARK: - Terminal events

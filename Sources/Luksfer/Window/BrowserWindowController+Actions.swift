@@ -132,6 +132,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = targets.allSatisfy(AppServices.shared.isFavorite) ? "Unpin from Favorites" : "Pin to Favorites"
             return !editingText
         case #selector(switchPane(_:)): return twoPanes
+        case #selector(addNetworkDrive(_:)): return !terminalHasFocus   // ⌘K clears a terminal
         default: return true
         }
     }
