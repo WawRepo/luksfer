@@ -34,6 +34,18 @@ enum DevHooks {
     }
 
     /// Draws the whole window (title bar and toolbar included) without screen-recording access.
+    /// The window's real screen pixels (an app may grab its own windows without a permission).
+    /// `cacheDisplay` misses the terminal's text, so the self-test uses this for the terminal.
+    static func grab(_ window: NSWindow, to url: URL) {
+        typealias Grab = @convention(c) (CGRect, UInt32, UInt32, UInt32) -> Unmanaged<CGImage>?
+        // CGWindowListCreateImage is hidden from the macOS 15 SDK; look it up by name.
+        guard let sym = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImage"),
+              let image = unsafeBitCast(sym, to: Grab.self)(.null, 8 /* including window */,
+                                                           UInt32(window.windowNumber), 1 | 8 /* no frame, best resolution */)?.takeRetainedValue()
+        else { return }
+        try? NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])?.write(to: url)
+    }
+
     static func snapshot(to url: URL) {
         guard let window = NSApp.windows.first(where: { $0.windowController is BrowserWindowController }),
               let frameView = window.contentView?.superview,

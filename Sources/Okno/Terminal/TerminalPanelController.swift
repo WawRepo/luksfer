@@ -110,6 +110,11 @@ final class TerminalPanelController: NSViewController {
         }
     }
 
+    /// Types `text` into the shell as if pasted (the self-test uses it).
+    func type(_ text: String) {
+        terminalView?.send(txt: text)
+    }
+
     /// Moves keyboard focus to the terminal (after the shell starts, if it has not yet).
     func focusTerminal() {
         _ = view

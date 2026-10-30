@@ -229,6 +229,41 @@ enum SelfTest {
         AppServices.shared.unpin(inner)
     }
 
+    /// Waits until `condition` is true, up to `seconds`.
+    private static func waitFor(_ seconds: Double, _ condition: () -> Bool) async -> Bool {
+        for _ in 0..<Int(seconds * 10) {
+            if condition() { return true }
+            await wait(0.1)
+        }
+        return condition()
+    }
+
+    /// Milestone 5: the panel starts in the pane's folder, and Follow works both ways.
+    /// The shell runs the user's own zsh config; Okno's typed cd lines stay out of the history.
+    private static func terminal(in folder: URL, window w: BrowserWindowController) async {
+        let inner = folder.appendingPathComponent("New folder")
+        func same(_ a: URL?, _ b: URL) -> Bool { a?.resolvingSymlinksInPath().standardizedFileURL.path == b.resolvingSymlinksInPath().standardizedFileURL.path }
+        w.setTwoPanes(false)
+        w.activePane.navigate(to: folder)
+        await wait()
+        w.openTerminal(at: folder, focus: false)
+        guard let t = w.terminal else { check("terminal opens", false); return }
+        check("terminal starts in the pane's folder", await waitFor(15) { same(t.currentFolder, folder) && t.isAtIdlePrompt })
+        if !AppServices.shared.settings.terminalFollow { t.followEnabled = true }
+        w.activePane.navigate(to: inner)
+        check("Follow: opening a folder moves the shell", await waitFor(10) { same(t.currentFolder, inner) && t.isAtIdlePrompt })
+        t.type(" builtin cd -- '\(folder.path)'\r")
+        check("Follow: cd in the shell moves the pane", await waitFor(10) { same(w.activePane.folder, folder) })
+        await wait(1.5)
+        if let window = w.window { DevHooks.grab(window, to: folder.deletingLastPathComponent().appendingPathComponent("terminal.png")) }
+        w.toggleTerminal(nil)
+        check("⌃` hides the terminal", !w.terminalOpen)
+        w.paneOpenTerminal(w.activePane)
+        check("“term” in the path bar opens the terminal", w.terminalOpen)
+        check("a terminal app to open is found", TerminalAppLauncher.applicationURL(for: .terminal) != nil)
+        w.closeTerminal()
+    }
+
     /// ⌘N opens a second window.
     private static func newWindow() async {
         let before = NSApp.windows.filter { $0.windowController is BrowserWindowController }.count
@@ -324,6 +359,7 @@ enum SelfTest {
         await navigation(in: folder, window: w)
         await drops(in: folder, window: w)
         await newWindow()
+        await terminal(in: folder, window: w)
 
         DevHooks.snapshot(to: folder.deletingLastPathComponent().appendingPathComponent("selftest.png"))
         finish()

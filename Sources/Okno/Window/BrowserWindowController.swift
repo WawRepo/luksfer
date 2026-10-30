@@ -204,7 +204,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     func openTerminal(at folder: URL, focus: Bool = true) {
         if terminal == nil {
-            let t = TerminalPanelController(startFolder: folder, shellFilesFolder: SettingsStore.defaultFolder.appendingPathComponent("shell", isDirectory: true))
+            let t = TerminalPanelController(startFolder: folder, shellFilesFolder: AppServices.shared.store.fileURL
+                .deletingLastPathComponent().appendingPathComponent("shell", isDirectory: true))
             t.delegate = self
             t.followEnabled = AppServices.shared.settings.terminalFollow
             terminal = t
