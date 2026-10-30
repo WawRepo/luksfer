@@ -122,7 +122,7 @@ final class FileListViewController: NSViewController {
         let hidden = AppServices.shared.settings.showHidden
         let previousSelection = isNewFolder ? [] : selectedURLs
         let started = ProcessInfo.processInfo.systemUptime
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let result = Result { try DirectoryReader.read(folder, includeHidden: hidden) }
             DispatchQueue.main.async { [weak self] in
                 guard let self, gen == self.generation else { return }

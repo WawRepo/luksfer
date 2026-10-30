@@ -18,7 +18,7 @@ protocol PaneDelegate: AnyObject {
 final class PaneViewController: NSViewController {
     weak var delegate: PaneDelegate?
     let list = FileListViewController()
-    let pathBar = PathBarView()
+    let pathBar: PathBarView
     private(set) var history: NavigationHistory
     private var watcher: FolderWatcher?
 
@@ -51,6 +51,7 @@ final class PaneViewController: NSViewController {
 
     init(folder: URL, sort: FileSortOrder) {
         history = NavigationHistory(start: folder)
+        pathBar = PathBarView(folder: folder)
         super.init(nibName: nil, bundle: nil)
         list.sortOrder = sort
     }
@@ -192,11 +193,15 @@ final class PaneViewController: NSViewController {
         navigate(to: folder.deletingLastPathComponent(), select: [child])
     }
 
-    func reload() { list.reload() }
+    func reload() {
+        pathBar.showsHiddenFolders = AppServices.shared.settings.showHidden
+        list.reload()
+    }
 
     private func show(_ url: URL, select: [URL]?) {
         guard isViewLoaded else { return }
         pathBar.folder = url
+        pathBar.showsHiddenFolders = AppServices.shared.settings.showHidden
         updateButtons()
         if !searchField.stringValue.isEmpty {
             searchField.stringValue = ""
