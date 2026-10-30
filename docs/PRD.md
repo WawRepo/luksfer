@@ -110,9 +110,9 @@ inside the window. It is the app you open for everyday file work instead of Find
 - **On a file:** Open, Open With ▸, Quick Look, Cut, Copy, Copy Path, Rename, Duplicate, Compress,
   Move to Trash; New folder and New text file *next to this file*; Open in Terminal (inside), Open in
   Terminal App; Get Info.
-- **On a folder:** Open, Open in Other Pane, Pin to or Unpin from Favorites, Cut, Copy, Paste Into Folder,
-  Copy Path, Rename, Move to Trash; a New ▸ submenu with a folder or text file *inside it* or *next to
-  it*; Open in Terminal (inside), Open in Terminal App.
+- **On a folder:** Open, Open in Other Pane, Pin to or Unpin from Favorites, Cut, Copy, Paste Into
+  Folder, Copy Path, Rename, Move to Trash; a New ▸ submenu with a folder or text file *inside it* or
+  *next to it*; Open in Terminal (inside), Open in Terminal App.
 - **On empty space:** New Folder, New Text File, New Markdown File, Paste, Copy Path, Pin This Folder,
   Open in Terminal, Open in Terminal App, Sort By, View.
 - Menu items show their key shortcuts.

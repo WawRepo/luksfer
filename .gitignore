@@ -1,11 +1,18 @@
-# Local settings, private notes and secrets (the repo goes public later)
+# Local dev files: AI assistant notes, private notes, editor settings and secrets
+CLAUDE.md
 CLAUDE.local.md
-.claude/settings.local.json
+.claude/
 .env
 .env.*
+.vscode/
+.idea/
 
-# Xcode and Swift Package Manager build output (builds go to ~/Library/Caches/luksfer-dev/)
+# Design-tool working files (the mockup that came before the app)
+docs/mockup/
+
+# Xcode and Swift Package Manager build output (the scripts build in ~/Library/Caches/luksfer-dev/)
 build/
+dist/
 DerivedData/
 .build/
 .swiftpm/

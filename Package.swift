@@ -18,7 +18,7 @@ let package = Package(
             name: "Luksfer",
             dependencies: ["LuksferCore", .product(name: "SwiftTerm", package: "SwiftTerm")]
         ),
-        // Spike benchmarks and checks. Run: swift run LuksferSpike <check>
+        // Spike benchmarks and checks (docs/spike-report.md). Run: swift run LuksferSpike <check>
         .executableTarget(
             name: "LuksferSpike",
             dependencies: ["LuksferCore", .product(name: "SwiftTerm", package: "SwiftTerm")],

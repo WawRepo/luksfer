@@ -1,6 +1,6 @@
 #!/bin/zsh
-# Runs one heavy job (Swift build, test run, benchmark) at a time on this Mac.
-# Every heavy command, from any session or subagent, goes through this script.
+# Runs one heavy job (Swift build, test run, benchmark) at a time on this machine. Builds started
+# from several terminals at once wait for each other instead of competing for memory.
 # Usage: scripts/heavy.sh <command> [args...]
 set -u
 lock_root="$HOME/Library/Caches/luksfer-dev"
