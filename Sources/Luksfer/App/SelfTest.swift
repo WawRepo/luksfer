@@ -89,9 +89,22 @@ enum SelfTest {
         let trash = URL(fileURLWithPath: ProcessInfo.processInfo.environment["LUKSFER_TRASH_DIR"]!)
         let trashed = names(trash).count
         FileActions.shared.transfer([folder.appendingPathComponent("notes.md")], into: inner, operation: .copy, in: w)
+        _ = await waitFor(10) { w.window?.attachedSheet != nil }
+        let text = w.window?.attachedSheet.map { sheetText($0.contentView) } ?? ""
+        let stop = button("Stop", in: w.window?.attachedSheet?.contentView)
+        let forAll = button("Do this for all", in: w.window?.attachedSheet?.contentView)
+        check("the clash question shows both sizes and dates", text.contains("New: ") && text.contains("Existing: ") && text.components(separatedBy: "modified").count == 3)
+        check("the clash question has Stop on Esc", stop?.keyEquivalent == "\u{1b}")
+        check("one clash has no “Do this for all”", forAll == nil || forAll?.isHidden == true || forAll?.superview == nil)
         check("a name clash asks first", await answer("Replace", on: w.window))
         await settle()
         check("Replace puts the old file in the Trash", names(trash).count == trashed + 1 && names(inner).contains("notes.md"))
+
+        let before = names(inner)
+        FileActions.shared.transfer([folder.appendingPathComponent("notes.md")], into: inner, operation: .copy, in: w)
+        check("Stop ends the copy", await answer("Stop", on: w.window))
+        await settle()
+        check("Stop changes nothing and shows no error", names(inner) == before && w.window?.attachedSheet == nil)
 
         FileActions.shared.transfer([folder.appendingPathComponent("notes.md")], into: inner, operation: .copy, in: w)
         check("the clash question comes again", await answer("Keep Both", on: w.window))

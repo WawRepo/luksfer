@@ -84,7 +84,7 @@ extension FileOperationEngine {
             .cancelled(partial: steps.isEmpty ? nil : FileChange(actionName: action, steps: steps))
         }
 
-        for job in prepared {
+        for (index, job) in prepared.enumerated() {
             if cancel.isCancelled { throw cancelled() }
             tracker.beginItem(name: job.source.lastPathComponent, bytes: job.bytes)
             let target = try await onQueue { self.target(for: job, mode: mode) }
@@ -101,7 +101,8 @@ extension FileOperationEngine {
                 var choice = remembered
                 if choice == nil {
                     let clash = NameClash(source: job.source, existing: existing,
-                                          sourceIsFolder: job.isFolder, existingIsFolder: existingIsFolder)
+                                          sourceIsFolder: job.isFolder, existingIsFolder: existingIsFolder,
+                                          laterItems: prepared.count - index - 1)
                     let decision = await resolveClash?(clash) ?? ClashDecision(choice: .keepBoth)
                     if decision.applyToAll { remembered = decision.choice }
                     choice = decision.choice
@@ -114,6 +115,7 @@ extension FileOperationEngine {
                     continue
                 case .keepBoth: keepBoth = true
                 case .replace: replacing = existing
+                case .stop: throw cancelled()
                 }
             }
             let finalDestination = destination, replaced = replacing, numbered = keepBoth

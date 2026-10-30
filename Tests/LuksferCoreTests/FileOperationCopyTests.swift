@@ -216,6 +216,37 @@ final class FileOperationCopyTests: FileOperationTestCase {
         XCTAssertEqual(recorder.clashes.map(\.source.lastPathComponent), ["x1.txt", "x2.txt"])
     }
 
+    func testClashStopEndsTheOperationAndKeepsDoneItemsUndoable() async throws {
+        let dest = try folder("dest")
+        let sources = [try file("src/x1.txt", "new1"), try file("src/x2.txt", "new2"), try file("src/x3.txt", "new3")]
+        try file("dest/x2.txt", "old2")
+        let recorder = ClashRecorder(.stop)
+        var partial: FileChange?
+        do {
+            _ = try await engine.copy(sources, into: dest, resolveClash: recorder.resolver, progress: nil)
+            XCTFail("Stop must end the copy")
+        } catch FileOperationError.cancelled(let done) {
+            partial = done
+        }
+        XCTAssertEqual(try names(dest), ["x1.txt", "x2.txt"], "x1 is done, x3 never starts")
+        XCTAssertEqual(try String(contentsOf: dest.appendingPathComponent("x2.txt"), encoding: .utf8), "old2")
+        let done = try XCTUnwrap(partial, "the done item can be undone")
+        _ = try await engine.undo(done)
+        XCTAssertEqual(try names(dest), ["x2.txt"])
+    }
+
+    func testClashSaysHowManyItemsFollow() async throws {
+        let dest = try folder("dest")
+        var sources: [URL] = []
+        for n in 1...3 {
+            sources.append(try file("src/x\(n).txt"))
+            try file("dest/x\(n).txt")
+        }
+        let recorder = ClashRecorder(.skip)
+        _ = try await engine.copy(sources, into: dest, resolveClash: recorder.resolver, progress: nil)
+        XCTAssertEqual(recorder.clashes.map(\.laterItems), [2, 1, 0])
+    }
+
     // MARK: Progress and cancel
 
     func testProgressTotalsAndReports() async throws {

@@ -8,6 +8,8 @@ public enum ClashChoice: Sendable, Equatable {
     case skip
     /// Copy or move the new item in as "name (2).ext".
     case keepBoth
+    /// Stop the whole operation here. Items already done stay done and can be undone.
+    case stop
 }
 
 /// The user's answer to one name clash.
@@ -28,6 +30,8 @@ public struct NameClash: Sendable {
     public let existing: URL
     public let sourceIsFolder: Bool
     public let existingIsFolder: Bool
+    /// How many picked items come after this one. More clashes can follow only when it is above 0.
+    public let laterItems: Int
 }
 
 /// Progress of a copy or move. Items are the top-level items the user picked;
