@@ -30,11 +30,6 @@ final class ShellQuotingTests: XCTestCase {
         }
     }
 
-    func testCdCommand() {
-        XCTAssertEqual(ShellQuoting.cdCommand(to: "/a b"), " builtin cd -- '/a b'\r")
-        XCTAssertTrue(ShellQuoting.cdCommand(to: "/x").hasPrefix(ShellQuoting.cdCommandPrefix))
-    }
-
     /// zsh and bash read every quoted word back as the original text.
     func testRoundTripThroughRealShells() throws {
         let samples = ["plain", "/a b/c", "it's", "''", "zażółć 文件 🎉", "$HOME `id` \"q\" \\n",

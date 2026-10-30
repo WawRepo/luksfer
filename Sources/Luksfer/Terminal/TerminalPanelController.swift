@@ -93,9 +93,9 @@ final class TerminalPanelController: NSViewController {
         startIfPending()
     }
 
-    /// Types ` builtin cd -- '<path>'` and Return when the shell waits at an empty prompt and is
-    /// elsewhere. Returns whether it typed, or will type right after a `cd` it typed before that
-    /// still runs. Does not check `followEnabled`.
+    /// Moves the shell to `folder` with the Follow widget (no visible `cd` line) when the shell
+    /// waits at an empty prompt and is elsewhere. Returns whether it sent the move, or will send it
+    /// right after its previous move ends. Does not check `followEnabled`.
     @discardableResult
     func changeDirectory(to folder: URL) -> Bool {
         guard isShellRunning, let terminalView else { return false }
@@ -113,6 +113,15 @@ final class TerminalPanelController: NSViewController {
     /// Types `text` into the shell as if pasted (the self-test uses it).
     func type(_ text: String) {
         terminalView?.send(txt: text)
+    }
+
+    /// The terminal's text, scrollback included (the self-test reads it). It selects all and
+    /// clears the selection again, as SwiftTerm has no other public way to read the text.
+    var screenText: String {
+        guard let terminalView else { return "" }
+        terminalView.selectAll()
+        defer { terminalView.selectNone() }
+        return terminalView.getSelection() ?? ""
     }
 
     /// Moves keyboard focus to the terminal (after the shell starts, if it has not yet).

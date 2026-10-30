@@ -16,25 +16,26 @@ public enum ShellMark: String, Sendable {
 /// prompt. Pure state: the panel feeds it the shell's marks and the user's input, and acts on
 /// what it returns.
 ///
-/// Idle means a `prompt` mark arrived and the user has not typed since. Luksfer types `cd` only
-/// when idle. A folder asked for while Luksfer's own `cd` still runs waits for the next prompt.
+/// Idle means a `prompt` mark arrived and the user has not typed since. Luksfer moves the shell
+/// only when idle (`ZshIntegration.followKeys(to:)`). A folder asked for while Luksfer's own move
+/// still runs waits for the next prompt.
 public struct ShellSessionState: Equatable, Sendable {
     /// The shell waits at an empty prompt and nothing was typed since.
     public private(set) var isIdle = false
     /// The last folder the shell reported.
     public private(set) var folder: URL?
-    /// Path of the `cd` Luksfer typed, until the next prompt.
+    /// Path of the move Luksfer sent, until the next prompt.
     private var sentPath: String?
-    /// Path asked for while Luksfer's own `cd` ran.
+    /// Path asked for while Luksfer's own move ran.
     private var queuedPath: String?
 
     public init() {}
 
     /// The answer to `request(_:)`.
     public enum Request: Equatable, Sendable {
-        /// Type this line now.
+        /// Send this text now (the Follow keys).
         case send(String)
-        /// Luksfer's previous `cd` still runs; this one follows at the next prompt.
+        /// Luksfer's previous move still runs; this one follows at the next prompt.
         case queued
         /// The shell is there already, or on its way.
         case alreadyThere
@@ -46,7 +47,7 @@ public struct ShellSessionState: Equatable, Sendable {
     public enum FolderChange: Equatable, Sendable {
         /// The user moved the shell (typed `cd`, ran a script...).
         case user(URL)
-        /// The result of a `cd` Luksfer typed.
+        /// The result of a move Luksfer sent.
         case own(URL)
     }
 
@@ -62,7 +63,7 @@ public struct ShellSessionState: Equatable, Sendable {
         return send(path)
     }
 
-    /// A mark arrived. Returns a line to type now (a queued `cd`), if any.
+    /// A mark arrived. Returns text to send now (a queued move), if any.
     public mutating func received(_ mark: ShellMark) -> String? {
         switch mark {
         case .prompt:
@@ -104,7 +105,7 @@ public struct ShellSessionState: Equatable, Sendable {
     private mutating func send(_ path: String) -> Request {
         isIdle = false
         sentPath = path
-        return .send(ShellQuoting.cdCommand(to: path))
+        return .send(ZshIntegration.followKeys(to: path))
     }
 
     /// The path without a trailing slash ("/" stays "/").

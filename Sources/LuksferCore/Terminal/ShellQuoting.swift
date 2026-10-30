@@ -28,16 +28,6 @@ public enum ShellQuoting {
         return out + "'"
     }
 
-    /// The line Luksfer types to move the shell to `path`, Return included. The leading space keeps
-    /// it out of history (HIST_IGNORE_SPACE); Luksfer's zsh integration also drops it from history.
-    /// `builtin` skips a user's `cd` alias or function (zoxide's `--cmd cd`, for example).
-    public static func cdCommand(to path: String) -> String {
-        cdCommandPrefix + singleQuoted(path) + "\r"
-    }
-
-    /// The start of every line `cdCommand(to:)` returns.
-    public static let cdCommandPrefix = " builtin cd -- "
-
     private static func isControl(_ scalar: Unicode.Scalar) -> Bool {
         scalar.properties.generalCategory == .control
     }

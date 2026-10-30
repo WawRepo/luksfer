@@ -317,7 +317,8 @@ enum SelfTest {
         if !AppServices.shared.settings.terminalFollow { t.followEnabled = true }
         w.activePane.navigate(to: inner)
         check("Follow: opening a folder moves the shell", await waitFor(10) { same(t.currentFolder, inner) && t.isAtIdlePrompt })
-        t.type(" builtin cd -- '\(folder.path)'\r")
+        check("Follow leaves no cd line in the terminal", !t.screenText.contains("cd --") && !t.screenText.isEmpty)
+        t.type(" builtin cd -- \(ShellQuoting.singleQuoted(folder.path))\r")
         check("Follow: cd in the shell moves the pane", await waitFor(10) { same(w.activePane.folder, folder) })
         t.focusTerminal()
         await wait()

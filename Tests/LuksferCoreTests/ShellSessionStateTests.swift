@@ -37,8 +37,8 @@ final class ShellSessionStateTests: XCTestCase {
 
     func testSendsCdWhenIdleAndReportsItAsOwn() {
         var s = idleInA()
-        XCTAssertEqual(s.request(b), .send(" builtin cd -- '/tmp/b b'\r"))
-        XCTAssertFalse(s.isIdle, "the line Luksfer typed is not user input, but the shell is busy now")
+        XCTAssertEqual(s.request(b), .send(ZshIntegration.followKeys(to: "/tmp/b b")))
+        XCTAssertFalse(s.isIdle, "the move Luksfer sent is not user input, but the shell is busy now")
         _ = s.received(.exec)
         XCTAssertEqual(s.reported(folder: b), .own(b))
         XCTAssertNil(s.received(.prompt))
@@ -66,7 +66,7 @@ final class ShellSessionStateTests: XCTestCase {
         guard case .send = s.request(b) else { return XCTFail("not sent") }
         XCTAssertEqual(s.request(c), .queued)
         XCTAssertEqual(s.reported(folder: b), .own(b))
-        XCTAssertEqual(s.received(.prompt), " builtin cd -- '/tmp/c'\r")
+        XCTAssertEqual(s.received(.prompt), ZshIntegration.followKeys(to: "/tmp/c"))
         XCTAssertFalse(s.isIdle)
         XCTAssertEqual(s.reported(folder: c), .own(c))
         XCTAssertNil(s.received(.prompt))

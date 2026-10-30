@@ -11,11 +11,24 @@ import Foundation
 ///
 /// The `prompt` mark comes from the line editor's `line-init` hook (zsh 5.3+), not `precmd`:
 /// `precmd` runs before the prompt is drawn, so text Luksfer types then is echoed twice.
+///
+/// Follow moves the shell with a line editor widget, not a typed `cd` line: Luksfer sends
+/// `followKeys(to:)`, the widget reads the folder, changes to it, runs the user's `chpwd` and
+/// `precmd` hooks and redraws the prompt in place. Nothing shows on screen or in the history.
 /// At the end `.zshrc` hands `ZDOTDIR` back, so `.zlogin`, `.zlogout` and child shells use the
 /// user's own files.
 public enum ZshIntegration {
     /// The private OSC code of Luksfer's prompt marks.
     public static let markCode = 6973
+
+    /// The key sequence bound to the Follow widget. No keyboard sends it.
+    public static let followKey = "\u{1B}[6973~"
+
+    /// What Luksfer sends to move the shell to `path`: the Follow key, the path's UTF-8 bytes in
+    /// lowercase hex, and ";". Hex keeps every byte of any path away from key bindings and quoting.
+    public static func followKeys(to path: String) -> String {
+        followKey + path.utf8.map { String(format: "%02x", $0) }.joined() + ";"
+    }
 
     /// File name → contents.
     public static func files() -> [String: String] {
@@ -72,8 +85,29 @@ public enum ZshIntegration {
     __luksfer_precmd() { __luksfer_osc7 }
     __luksfer_preexec() { __luksfer_emit $'\e]6973;exec\a' }
     __luksfer_prompt_fallback() { __luksfer_emit $'\e]6973;prompt\a' }
-    # Luksfer types " builtin cd -- '<folder>'" to follow the active pane; keep it out of history.
+    # Keep typed " builtin cd -- '<folder>'" lines (the self-test types one) out of history.
     __luksfer_addhistory() { [[ "$1" != ' builtin cd -- '* ]] }
+
+    # Follow: Luksfer sends ESC [6973~, the folder as hex bytes, then ";". REPLY = the folder.
+    __luksfer_follow_read() {
+      emulate -L zsh -o extended_glob
+      local hex c
+      while builtin read -rk 1 c && [[ "$c" != ';' ]] && (( ${#hex} < 8192 )); do hex+="$c"; done
+      [[ "$hex" == ([0-9a-f][0-9a-f])## ]] || return 1
+      builtin printf -v REPLY "${hex//(#b)(??)/\\x$match[1]}"
+    }
+    # The widget changes folder without a command line. It runs the hooks a cd at the prompt would
+    # run, in the user's own options (so no emulate here), then redraws the prompt in place.
+    __luksfer_follow() {
+      local REPLY __luksfer_f
+      if __luksfer_follow_read && builtin cd -q -- "$REPLY" 2>/dev/null; then
+        for __luksfer_f in chpwd "${chpwd_functions[@]-}" precmd "${precmd_functions[@]-}"; do
+          [[ -n "$__luksfer_f" ]] && (( ${+functions[$__luksfer_f]} )) && "$__luksfer_f" &>/dev/null
+        done
+        zle reset-prompt
+      fi
+      __luksfer_emit $'\e]6973;prompt\a'
+    }
 
     __luksfer_install() {
       emulate -L zsh
@@ -81,6 +115,9 @@ public enum ZshIntegration {
       add-zsh-hook precmd __luksfer_precmd
       add-zsh-hook preexec __luksfer_preexec
       add-zsh-hook zshaddhistory __luksfer_addhistory
+      zle -N __luksfer_follow
+      local keymap
+      for keymap in emacs viins vicmd; do bindkey -M "$keymap" $'\e[6973~' __luksfer_follow; done
       if is-at-least 5.3; then
         autoload -Uz add-zle-hook-widget
         add-zle-hook-widget line-init __luksfer_line_init
