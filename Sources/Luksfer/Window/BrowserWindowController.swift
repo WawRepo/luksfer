@@ -62,8 +62,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Keys work in the list from the start (not in the sidebar or the search box).
         window.initialFirstResponder = activePane.list.tableView
 
-        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            self?.activatePane(at: event)
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]) { [weak self] event in
+            guard let self, event.window === window else { return event }
+            if event.type == .otherMouseDown {
+                return navigate(mouseButton: event.buttonNumber, at: event.locationInWindow) ? nil : event
+            }
+            activatePane(at: event.locationInWindow)
             return event
         }
         statusBar.onStop = { [weak self] in self?.stopOperation() }
@@ -152,15 +156,23 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if changed, terminalOpen, terminal?.followEnabled == true { terminal?.changeDirectory(to: activePane.folder) }
     }
 
-    private func activatePane(at event: NSEvent) {
-        guard event.window === window else { return }
+    private func activatePane(at point: NSPoint) {
         for (i, pane) in panes.enumerated() where !pane.view.isHidden {
-            let p = pane.view.convert(event.locationInWindow, from: nil)
+            let p = pane.view.convert(point, from: nil)
             if pane.view.bounds.contains(p) {
                 if i != activeIndex { setActive(i) }
                 return
             }
         }
+    }
+
+    /// The back and forward buttons of a mouse (button numbers 3 and 4) go back and forward in the
+    /// pane under the pointer, like in Explorer. Elsewhere in the window they work on the active pane.
+    func navigate(mouseButton: Int, at point: NSPoint) -> Bool {
+        guard mouseButton == 3 || mouseButton == 4, window?.attachedSheet == nil, NSApp.modalWindow == nil else { return false }
+        activatePane(at: point)
+        if mouseButton == 3 { activePane.goBack() } else { activePane.goForward() }
+        return true
     }
 
     @objc func switchPane(_ sender: Any?) {

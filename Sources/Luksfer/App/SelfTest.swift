@@ -55,6 +55,17 @@ enum SelfTest {
         view.keyDown(with: event)
     }
 
+    /// Presses an extra mouse button (3 is back, 4 is forward) through the app's event dispatch.
+    /// A made-up event gets a wrong spot, so the active pane takes it.
+    private static func mouseButton(_ number: Int, in w: BrowserWindowController) {
+        guard let window = w.window,
+              let cg = NSEvent.mouseEvent(with: .otherMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                          windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)?.cgEvent
+        else { return }
+        cg.setIntegerValueField(.mouseEventButtonNumber, value: Int64(number))
+        if let event = NSEvent(cgEvent: cg) { NSApp.sendEvent(event) }
+    }
+
     /// Finds a button by title in a view tree.
     private static func button(_ title: String, in view: NSView?) -> NSButton? {
         guard let view else { return nil }
@@ -156,6 +167,12 @@ enum SelfTest {
         key(NSUpArrowFunctionKey, .command, to: table)
         await wait()
         check("⌘↑ goes up", pane.folder.standardizedFileURL == folder.standardizedFileURL)
+        mouseButton(3, in: w)
+        await wait()
+        check("the mouse back button goes back", pane.folder.standardizedFileURL == inner.standardizedFileURL)
+        mouseButton(4, in: w)
+        await wait()
+        check("the mouse forward button goes forward", pane.folder.standardizedFileURL == folder.standardizedFileURL)
 
         // A slow folder: the old rows go, so nothing acts on the old folder while it loads.
         pane.list.select([folder.appendingPathComponent("notes.md")], scroll: false)
@@ -245,6 +262,21 @@ enum SelfTest {
         await wait(0.3)
         check("the mark follows the active pane", w.panes[1].showsAsActive && !w.panes[0].showsAsActive)
         DevHooks.snapshot(to: folder.deletingLastPathComponent().appendingPathComponent("active-pane.png"))
+        w.setActive(0)
+
+        // The mouse back button works on the pane under the pointer.
+        w.panes[1].navigate(to: folder)
+        w.panes[1].navigate(to: inner)
+        await wait()
+        let rightMiddle = w.panes[1].view.convert(NSPoint(x: w.panes[1].view.bounds.midX, y: w.panes[1].view.bounds.midY), to: nil)
+        _ = w.navigate(mouseButton: 3, at: rightMiddle)
+        await wait()
+        check("the mouse back button works on the pane under the pointer",
+              w.activePane === w.panes[1] && w.panes[1].folder.standardizedFileURL == folder.standardizedFileURL
+              && w.panes[0].folder.standardizedFileURL == folder.standardizedFileURL)
+        _ = w.navigate(mouseButton: 4, at: rightMiddle)
+        await wait()
+        check("the mouse forward button comes back", w.panes[1].folder.standardizedFileURL == inner.standardizedFileURL)
         w.setActive(0)
 
         let drag = SelfTestDrag([file])
