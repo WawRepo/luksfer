@@ -105,8 +105,14 @@ inside the window. It is the app you open for everyday file work instead of Find
   context menu. Reorder by drag. Unpin from the context menu or in Edit mode (↑ ↓ ✕ buttons).
   Rename the label; the path stays.
 - **This Mac:** Home, Desktop, Documents, Downloads, Pictures, Google Drive.
-- **Locations:** Macintosh HD, Applications, external drives (with Eject), the Trash. Network
-  shares later.
+- **Locations:** Macintosh HD, Applications, external drives (with Eject), the Trash.
+- **Network:** saved network drives (SMB), then network volumes mounted some other way. The + on
+  the section, or ⌘K, adds a drive, like Explorer's "Map network drive": address
+  (`smb://server/share` or `\\server\share`), name, user (empty for a guest) and password. Click a
+  drive to connect; it opens in the active pane. A connected drive shows Disconnect (the Eject
+  button). Context menu: Connect or Open, Disconnect, Edit, Remove.
+- The password goes to the macOS Keychain only, never into the settings file. Luksfer never shows a
+  saved password again; Edit can only replace it. Without a saved password, Connect asks for it.
 - Sections fold open and closed.
 
 ### 6.5 Context menu
@@ -159,6 +165,8 @@ inside the window. It is the app you open for everyday file work instead of Find
   big download.
 - Slow folders (cloud, network) load in the background. The window never freezes; the pane shows
   that it is loading.
+- A network server that goes away never freezes the sidebar: Luksfer reads the mount table without
+  waiting for a server. Connecting runs in the background and can be stopped.
 
 ## 7. Non-functional requirements
 
@@ -167,7 +175,8 @@ inside the window. It is the app you open for everyday file work instead of Find
 - **Never block the window** on disk, network or cloud work.
 - **Memory:** under 200 MB with two panes and the terminal open.
 - **Safety:** delete goes to the Trash; every destructive action can be undone or asks first.
-- **Privacy:** no network requests and no telemetry.
+- **Privacy:** no network requests and no telemetry. The only network use is a network drive the
+  user set up; macOS makes that connection.
 - **Native:** dark mode, the system accent color, VoiceOver labels, and every action by keyboard.
 - **Platform:** Apple Silicon, macOS 15 or newer.
 - **Permissions:** when macOS blocks a folder (Desktop, Documents, Downloads, external drives), Luksfer
