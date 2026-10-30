@@ -1,0 +1,22 @@
+# Local settings, private notes and secrets (the repo goes public later)
+CLAUDE.local.md
+.claude/settings.local.json
+.env
+.env.*
+
+# Xcode and Swift Package Manager build output (builds go to ~/Library/Caches/okno-dev/)
+build/
+DerivedData/
+.build/
+.swiftpm/
+xcuserdata/
+*.xcuserstate
+
+# Test sandboxes (tests write only under ~/Library/Caches/okno-dev/)
+sandbox/
+
+# OS
+.DS_Store
+
+# Python bytecode (scripts/make-icon.py)
+__pycache__/
