@@ -23,6 +23,9 @@ xcrun actool "$root/Resources/AppIcon.icon" --compile "$app/Contents/Resources" 
   --output-partial-info-plist "$scratch/icon-partial.plist" > /dev/null
 cp "$root/Resources/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"
 
+# The licenses of the third-party code compiled into the app (SwiftTerm and what it includes).
+cp "$root/THIRD_PARTY_NOTICES.md" "$app/Contents/Resources/THIRD_PARTY_NOTICES.md"
+
 build_number=$(git -C "$root" rev-list --count HEAD 2>/dev/null || echo 1)
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
