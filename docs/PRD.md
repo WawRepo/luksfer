@@ -1,8 +1,8 @@
-# Okno — PRD v0.1
+# Luksfer — PRD v0.1
 
 Oct 30, 2026 · Waw · Status: draft
 
-*Working name: Okno (Polish for "window"). Run a trademark and domain check before any public use.*
+*Name: Luksfer (Polish for a glass block; the working name was Okno, Polish for "window").*
 
 Mockup (clickable): source in `docs/mockup/`.
 
@@ -56,10 +56,10 @@ inside the window. It is the app you open for everyday file work instead of Find
   ⌘⌫ moves to the Trash, ⌘↑ goes up, ⌘L edits the path. A setting switches to Finder keys.
 - **Delete means Trash.** A permanent delete needs ⇧ and a confirm. Every file action can be undone
   or asks first.
-- **Finder stays.** macOS keeps Finder for the desktop and the Dock. Okno does not replace them.
+- **Finder stays.** macOS keeps Finder for the desktop and the Dock. Luksfer does not replace them.
 - **Standard files on the clipboard and in drag and drop**, so Finder, Mail and VS Code see normal
   files.
-- **Own settings only.** Favorites, columns and panes live in Okno's settings. Okno never changes
+- **Own settings only.** Favorites, columns and panes live in Luksfer's settings. Luksfer never changes
   Finder's settings or Finder's sidebar.
 - **No network, no telemetry, no account.**
 - **Open source later.** The repo becomes public after v1 works; no date yet. Until then it is
@@ -73,7 +73,7 @@ inside the window. It is the app you open for everyday file work instead of Find
 - Each pane has its own folder, back and forward history, selection, sort and search.
 - Tab moves to the other pane. The active pane has a clear mark.
 - "Open in other pane", "Swap panes", and "Same folder in both".
-- More windows with ⌘N. Okno remembers the panes and their folders between launches.
+- More windows with ⌘N. Luksfer remembers the panes and their folders between launches.
 
 ### 6.2 Details view (default)
 
@@ -123,7 +123,7 @@ inside the window. It is the app you open for everyday file work instead of Find
 ### 6.6 File actions
 
 - Cut, copy and paste files with ⌘X, ⌘C, ⌘V. Copy and paste work both ways with Finder. A cut in
-  Okno that is pasted in Finder becomes a copy (Finder has no cut).
+  Luksfer that is pasted in Finder becomes a copy (Finder has no cut).
 - Drag and drop: between panes, onto a folder row, onto Favorites (pins it), and to and from other
   apps. Same disk: move. Other disk: copy. ⌥ forces copy, ⌘ forces move. A badge says what will
   happen.
@@ -144,7 +144,7 @@ inside the window. It is the app you open for everyday file work instead of Find
 
 ### 6.8 Default file viewer
 
-- An option to make Okno answer "Show in Finder" and "Reveal in Finder" from other apps, where
+- An option to make Luksfer answer "Show in Finder" and "Reveal in Finder" from other apps, where
   macOS allows it. ForkLift and Path Finder offer this; the spike checks how and on which macOS.
 
 ### 6.9 Cloud and network folders
@@ -165,7 +165,7 @@ inside the window. It is the app you open for everyday file work instead of Find
 - **Privacy:** no network requests and no telemetry.
 - **Native:** dark mode, the system accent color, VoiceOver labels, and every action by keyboard.
 - **Platform:** Apple Silicon, macOS 15 or newer.
-- **Permissions:** when macOS blocks a folder (Desktop, Documents, Downloads, external drives), Okno
+- **Permissions:** when macOS blocks a folder (Desktop, Documents, Downloads, external drives), Luksfer
   says why and how to allow it (Files and Folders, or Full Disk Access).
 
 ## 8. Out of scope (v1)
@@ -178,7 +178,7 @@ inside the window. It is the app you open for everyday file work instead of Find
 
 ## 9. Risks and open questions
 
-- **macOS limits.** Finder always runs. "Show in Finder" may come to Okno only from apps that ask
+- **macOS limits.** Finder always runs. "Show in Finder" may come to Luksfer only from apps that ask
   macOS for the file viewer. Spike.
 - **The list view.** SwiftUI `Table` may be too slow or too limited for 10,000 rows and drag and
   drop; AppKit is the safer start. Spike.
@@ -205,5 +205,5 @@ inside the window. It is the app you open for everyday file work instead of Find
 4. **Two panes and drag and drop:** between panes, onto folder rows, onto Favorites, and with other
    apps.
 5. **Terminal:** the built-in panel with Follow, "Open in Terminal app", and `term` in the path bar.
-6. **Dogfood:** use Okno as the daily file manager; set it as the default file viewer; fix what
+6. **Dogfood:** use Luksfer as the daily file manager; set it as the default file viewer; fix what
    hurts. Then decide on tabs, the icons view, the license, and when the repo goes public.

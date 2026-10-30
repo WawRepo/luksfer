@@ -1,7 +1,8 @@
-# Okno
+# Luksfer
 
-Okno is a native macOS file explorer that works like Windows Explorer. "Okno" is Polish for
-"window", and it is a working name.
+Luksfer is a native macOS file explorer that works like Windows Explorer. "Luksfer" is Polish
+for a glass block, the brick that lets light through a wall. Its working name was Okno (Polish
+for "window"), so older commits use that name.
 
 **Status:** early. Version 1 is built for one user, the author, as a daily file manager. It is not
 signed for distribution and there are no releases yet.
@@ -22,8 +23,8 @@ signed for distribution and there are no releases yet.
 
 - No network requests, no telemetry, no account.
 - Listing a cloud folder (Google Drive and other File Provider folders) never downloads a file.
-  Okno reads names, sizes and dates only, and draws icons from the file type.
-- Okno keeps its own settings in `~/Library/Application Support/Okno/`. It never changes
+  Luksfer reads names, sizes and dates only, and draws icons from the file type.
+- Luksfer keeps its own settings in `~/Library/Application Support/Luksfer/`. It never changes
   Finder's settings or Finder's sidebar.
 
 ## Requirements
@@ -34,15 +35,15 @@ signed for distribution and there are no releases yet.
 
 ## Build and run
 
-The scripts build outside the repo, in `~/Library/Caches/okno-dev/`, and run one heavy job
+The scripts build outside the repo, in `~/Library/Caches/luksfer-dev/`, and run one heavy job
 (build, tests) at a time.
 
 ```sh
-scripts/build-app.sh                  # writes ~/Library/Caches/okno-dev/dist/Okno.app
-open ~/Library/Caches/okno-dev/dist/Okno.app
+scripts/build-app.sh                  # writes ~/Library/Caches/luksfer-dev/dist/Luksfer.app
+open ~/Library/Caches/luksfer-dev/dist/Luksfer.app
 
 scripts/build.sh                      # debug build of the package
-OKNO_SWIFT=test scripts/build.sh      # unit tests (OknoCoreTests)
+LUKSFER_SWIFT=test scripts/build.sh      # unit tests (LuksferCoreTests)
 ```
 
 The app also has an in-app self-test that drives the real window (file actions, keys, drag and
@@ -53,11 +54,11 @@ sandbox folders, never your real ones.
 
 ```text
 Package.swift            Swift package, no Xcode project
-Sources/OknoCore/        file system logic, no UI: listing, file operations and undo, paths,
+Sources/LuksferCore/        file system logic, no UI: listing, file operations and undo, paths,
                          navigation, settings, shell integration
-Sources/Okno/            the AppKit app: window, panes, file list, path bar, sidebar, menus,
+Sources/Luksfer/            the AppKit app: window, panes, file list, path bar, sidebar, menus,
                          terminal panel
-Tests/OknoCoreTests/     unit tests for OknoCore
+Tests/LuksferCoreTests/     unit tests for LuksferCore
 Spike/                   the speed and feasibility checks that chose the stack
 Resources/               app icon
 scripts/                 build, test and icon scripts
@@ -68,6 +69,6 @@ docs/mockup/             source of the clickable mockup
 
 ## License
 
-Not chosen yet. Until a license is added, no rights are granted to use, copy or change this code.
+MIT. See [LICENSE](LICENSE).
 
 Third-party code and its licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

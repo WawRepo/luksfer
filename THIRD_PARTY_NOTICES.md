@@ -1,18 +1,18 @@
 # Third-party notices
 
-Okno uses the open source packages below. This file lists each one with its license.
+Luksfer uses the open source packages below. This file lists each one with its license.
 
-**Compiled into Okno.app:** SwiftTerm only, together with the code from other projects that
+**Compiled into Luksfer.app:** SwiftTerm only, together with the code from other projects that
 SwiftTerm itself includes (listed under SwiftTerm).
 
-**Resolved but not compiled into Okno.app:** swift-png, h and swift-argument-parser. Swift Package
+**Resolved but not compiled into Luksfer.app:** swift-png, h and swift-argument-parser. Swift Package
 Manager fetches them because SwiftTerm depends on them, but SwiftTerm uses swift-png (which uses h) only on
 Linux, Windows, WASI and Android, and swift-argument-parser only in its `termcast` command-line
 tool. They are listed here for completeness.
 
 Versions are the ones pinned in `Package.resolved`.
 
-| Package | Version | License | In Okno.app |
+| Package | Version | License | In Luksfer.app |
 |---|---|---|---|
 | [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) | 1.99.2 | MIT | yes |
 | [swift-png](https://github.com/tayloraswift/swift-png) | 4.5.2 | Apache-2.0 | no |
@@ -153,7 +153,7 @@ authorization of the copyright holder.
 
 ## swift-png
 
-<https://github.com/tayloraswift/swift-png> · version 4.5.2 · Apache License 2.0 · not in Okno.app
+<https://github.com/tayloraswift/swift-png> · version 4.5.2 · Apache License 2.0 · not in Luksfer.app
 
 NOTICE:
 
@@ -177,7 +177,7 @@ The license is the Apache License 2.0 (full text below), with this copyright lin
 
 ## h
 
-<https://github.com/rarestype/h> · version 1.0.1 · Apache License 2.0 · not in Okno.app
+<https://github.com/rarestype/h> · version 1.0.1 · Apache License 2.0 · not in Luksfer.app
 
 NOTICE:
 
@@ -198,7 +198,7 @@ The license is the Apache License 2.0 (full text below), with this copyright lin
 ## swift-argument-parser
 
 <https://github.com/apple/swift-argument-parser> · version 1.8.2 · Apache License 2.0 with the
-Runtime Library Exception · not in Okno.app
+Runtime Library Exception · not in Luksfer.app
 
 The license is the Apache License 2.0 (full text below), plus this exception:
 

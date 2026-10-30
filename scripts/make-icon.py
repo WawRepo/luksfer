@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draw Okno's app icon and write every file macOS needs.
+"""Draw Luksfer's app icon and write every file macOS needs.
 
 Run from anywhere (needs Python 3 with Pillow; iconutil and actool come with macOS / Xcode):
 
@@ -13,10 +13,10 @@ Writes, inside the repo:
     Resources/Assets.xcassets/AppIcon.appiconset/  every mac size as PNG + Contents.json
     Resources/AppIcon.icon/                        Icon Composer bundle (macOS 26 Liquid Glass)
 
-Temporary files (the .iconset, the preview, the actool output) go to ~/Library/Caches/okno-dev/icon/.
+Temporary files (the .iconset, the preview, the actool output) go to ~/Library/Caches/luksfer-dev/icon/.
 
 The design: a window seen head-on. The rounded square is an orange window frame; a mullion with
-a handle splits the glass into two tall panes (Okno's two panes) with one sky behind them. Shapes
+a handle splits the glass into two tall panes (Luksfer's two panes) with one sky behind them. Shapes
 are drawn at 4x and scaled down with LANCZOS. The 16 and 32 px images use a simpler drawing
 whose edges sit on whole pixels, so they stay sharp.
 """
@@ -35,7 +35,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 REPO = Path(__file__).resolve().parent.parent
 RESOURCES = REPO / "Resources"
-SCRATCH = Path.home() / "Library" / "Caches" / "okno-dev" / "icon"
+SCRATCH = Path.home() / "Library" / "Caches" / "luksfer-dev" / "icon"
 
 GRID = 1024.0  # all geometry is in units of the 1024 x 1024 master
 SUPERSAMPLE = 4

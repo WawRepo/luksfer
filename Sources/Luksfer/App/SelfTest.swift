@@ -1,0 +1,378 @@
+import AppKit
+import LuksferCore
+import Quartz
+
+/// An end-to-end check of the file actions in the running app, for test runs only.
+/// LUKSFER_SELFTEST=1 with LUKSFER_OPEN=<empty sandbox folder> and LUKSFER_TRASH_DIR=<sandbox trash>:
+/// creates, copies, renames, trashes, undoes and redoes, prints PASS/FAIL lines, then quits.
+@MainActor
+enum SelfTest {
+    static func scheduleIfAsked() {
+        if ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] == "restore" {
+            Task { await restore() }
+            return
+        }
+        guard ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] == "1",
+              ProcessInfo.processInfo.environment["LUKSFER_TRASH_DIR"] != nil,
+              let folder = DevHooks.openFolder else { return }
+        Task { await run(in: folder) }
+    }
+
+    private static var failures = 0
+
+    private static func check(_ name: String, _ ok: Bool) {
+        if !ok { failures += 1 }
+        FileHandle.standardError.write(Data("selftest: \(ok ? "PASS" : "FAIL") \(name)\n".utf8))
+    }
+
+    private static func names(_ folder: URL) -> Set<String> {
+        Set((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
+    }
+
+    private static func wait(_ seconds: Double = 0.6) async { try? await Task.sleep(for: .seconds(seconds)) }
+
+    /// Prints the result and quits, also when a sheet is still open. Exit code 1 on a failure.
+    private static func finish() {
+        FileHandle.standardError.write(Data("selftest: \(failures == 0 ? "ALL PASSED" : "\(failures) FAILED")\n".utf8))
+        if failures > 0 { exit(1) }
+        for w in NSApp.windows { if let sheet = w.attachedSheet { w.endSheet(sheet) } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { exit(0) }
+        NSApp.terminate(nil)   // saves the window state, for LUKSFER_SELFTEST=restore
+    }
+
+    /// Sends a key press to the view, as if typed.
+    private static func key(_ code: Int, _ flags: NSEvent.ModifierFlags = [], to view: NSView) {
+        let chars = String(Character(UnicodeScalar(UInt32(code))!))
+        guard let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+                                           windowNumber: view.window?.windowNumber ?? 0, context: nil, characters: chars,
+                                           charactersIgnoringModifiers: chars, isARepeat: false, keyCode: 0) else { return }
+        view.keyDown(with: event)
+    }
+
+    /// Finds a button by title in a view tree.
+    private static func button(_ title: String, in view: NSView?) -> NSButton? {
+        guard let view else { return nil }
+        if let b = view as? NSButton, b.title == title { return b }
+        for sub in view.subviews { if let b = button(title, in: sub) { return b } }
+        return nil
+    }
+
+    private static func sheetText(_ view: NSView?) -> String {
+        guard let view else { return "" }
+        let own = (view as? NSButton)?.title ?? (view as? NSTextField)?.stringValue ?? ""
+        return ([own] + view.subviews.map(sheetText)).filter { !$0.isEmpty }.joined(separator: " | ")
+    }
+
+    /// Waits for a sheet on the window and clicks its button. False when no sheet came.
+    private static func answer(_ title: String, on window: NSWindow?) async -> Bool {
+        for _ in 0..<100 {
+            if let sheet = window?.attachedSheet, let b = button(title, in: sheet.contentView) {
+                b.performClick(nil)
+                return true
+            }
+            await wait(0.1)
+        }
+        let open = window?.attachedSheet.map { sheetText($0.contentView) } ?? "no sheet"
+        FileHandle.standardError.write(Data("selftest: no “\(title)” button; open: \(open)\n".utf8))
+        return false
+    }
+
+    /// The name-clash question and the "delete for good" question (milestone 3).
+    private static func questions(in folder: URL, window w: BrowserWindowController) async {
+        let inner = folder.appendingPathComponent("New folder")
+        let trash = URL(fileURLWithPath: ProcessInfo.processInfo.environment["LUKSFER_TRASH_DIR"]!)
+        let trashed = names(trash).count
+        FileActions.shared.transfer([folder.appendingPathComponent("notes.md")], into: inner, operation: .copy, in: w)
+        check("a name clash asks first", await answer("Replace", on: w.window))
+        await wait(1.2)
+        check("Replace puts the old file in the Trash", names(trash).count == trashed + 1 && names(inner).contains("notes.md"))
+
+        FileActions.shared.transfer([folder.appendingPathComponent("notes.md")], into: inner, operation: .copy, in: w)
+        check("the clash question comes again", await answer("Keep Both", on: w.window))
+        await wait(1.2)
+        check("Keep Both keeps both", names(inner).count == 2)
+
+        let file = folder.appendingPathComponent("New text file.txt")
+        FileActions.shared.deletePermanently([file], in: w)
+        check("Delete Immediately asks first", await answer("Cancel", on: w.window))
+        await wait()
+        check("Cancel keeps the file", names(folder).contains("New text file.txt"))
+    }
+
+    /// Milestone 2 and 4: keys, Quick Look, search, sort, hidden files, Favorites, pane switching.
+    private static func navigation(in folder: URL, window w: BrowserWindowController) async {
+        let inner = folder.appendingPathComponent("New folder")
+        w.setActive(0)
+        let pane = w.activePane
+        pane.navigate(to: folder)
+        await wait()
+        let table = pane.list.tableView
+        pane.list.focus()
+
+        pane.list.select([inner], scroll: false)
+        key(NSCarriageReturnCharacter, to: table)
+        await wait()
+        check("Enter opens a folder", pane.folder.standardizedFileURL == inner.standardizedFileURL)
+        key(NSDeleteCharacter, to: table)
+        await wait()
+        check("Backspace goes back", pane.folder.standardizedFileURL == folder.standardizedFileURL)
+        check("going back selects the folder you came from", pane.list.selectedItems.map(\.name) == ["New folder"])
+        key(NSDownArrowFunctionKey, .command, to: table)
+        await wait()
+        check("⌘↓ opens a folder", pane.folder.standardizedFileURL == inner.standardizedFileURL)
+        key(NSUpArrowFunctionKey, .command, to: table)
+        await wait()
+        check("⌘↑ goes up", pane.folder.standardizedFileURL == folder.standardizedFileURL)
+
+        pane.list.select([folder.appendingPathComponent("notes.md")], scroll: false)
+        key(0x20, to: table)
+        await wait(1.0)
+        check("Space opens Quick Look", QLPreviewPanel.sharedPreviewPanelExists() && QLPreviewPanel.shared().isVisible)
+        pane.list.toggleQuickLook()
+        await wait()
+        check("Quick Look closes", !QLPreviewPanel.shared().isVisible)
+        pane.list.focus()
+
+        pane.list.select([folder.appendingPathComponent("notes.md")], scroll: false)
+        key(NSF2FunctionKey, to: table)
+        await wait()
+        check("F2 starts rename", pane.list.isRenaming)
+        pane.list.focus()
+        await wait()
+
+        pane.list.filterQuery = "notes"
+        check("search box filters the list", pane.list.items.map(\.name) == ["notes.md"])
+        pane.list.filterQuery = ""
+
+        let byName = pane.list.items.map(\.name)
+        pane.list.sortOrder = FileSortOrder(key: .name, ascending: false)
+        let reversed = pane.list.items.map(\.name)
+        check("folders stay first when sorted Z to A", reversed.first == "New folder" && reversed != byName)
+        pane.list.sortOrder = FileSortOrder()
+
+        FileManager.default.createFile(atPath: folder.appendingPathComponent(".secret").path, contents: nil)
+        pane.reload()
+        await wait()
+        check("hidden files stay hidden", !pane.list.items.contains { $0.name == ".secret" })
+        w.toggleHiddenFiles(nil)
+        await wait()
+        check("Show Hidden Files shows them", pane.list.items.contains { $0.name == ".secret" })
+        w.toggleHiddenFiles(nil)
+        await wait()
+
+        AppServices.shared.pin([inner])
+        check("Pin to Favorites", AppServices.shared.isFavorite(inner))
+        AppServices.shared.unpin(inner)
+        check("Unpin", !AppServices.shared.isFavorite(inner))
+
+        key(NSTabCharacter, to: table)
+        await wait()
+        check("Tab switches to the other pane", w.activePane === w.panes[1])
+        w.setActive(0)
+    }
+
+    /// Milestone 4: drops between panes, onto a folder row, onto the sidebar, and ⌥ copy.
+    private static func drops(in folder: URL, window w: BrowserWindowController) async {
+        let inner = folder.appendingPathComponent("New folder")
+        let file = folder.appendingPathComponent("New text file.txt")
+        let undo = AppServices.shared.undoManager
+        w.setTwoPanes(true, focus: false)
+        w.setActive(0)
+        w.panes[0].navigate(to: folder)
+        w.panes[1].navigate(to: inner)
+        await wait()
+        let left = w.panes[0].list, right = w.panes[1].list
+
+        let drag = SelfTestDrag([file])
+        check("drop into the other pane is allowed", right.tableView(right.tableView, validateDrop: drag, proposedRow: -1, proposedDropOperation: .above) == .move)
+        check("drop into its own folder does nothing", left.tableView(left.tableView, validateDrop: drag, proposedRow: -1, proposedDropOperation: .above) == [])
+        let folderDrag = SelfTestDrag([inner])
+        let innerRow = left.items.firstIndex { $0.name == "New folder" } ?? -1
+        check("drop of a folder into itself is refused", left.tableView(left.tableView, validateDrop: folderDrag, proposedRow: innerRow, proposedDropOperation: .on) == [])
+
+        _ = right.tableView(right.tableView, acceptDrop: drag, row: -1, dropOperation: .above)
+        await wait(1.2)
+        check("drag to the other pane moves (same disk)", names(inner).contains(file.lastPathComponent) && !names(folder).contains(file.lastPathComponent))
+        check("both panes show the move", right.items.contains { $0.name == file.lastPathComponent } && !left.items.contains { $0.name == file.lastPathComponent })
+        undo.undo()
+        await wait(1.2)
+        check("undo the drag", names(folder).contains(file.lastPathComponent) && !names(inner).contains(file.lastPathComponent))
+
+        _ = right.tableView(right.tableView, acceptDrop: SelfTestDrag([file], mask: .copy), row: -1, dropOperation: .above)
+        await wait(1.2)
+        check("⌥ drag copies", names(inner).contains(file.lastPathComponent) && names(folder).contains(file.lastPathComponent))
+        undo.undo()
+        await wait(1.2)
+
+        let row = left.items.firstIndex { $0.name == "New folder" } ?? -1
+        _ = left.tableView(left.tableView, acceptDrop: SelfTestDrag([file]), row: row, dropOperation: .on)
+        await wait(1.2)
+        check("drop onto a folder row moves into it", names(inner).contains(file.lastPathComponent) && !names(folder).contains(file.lastPathComponent))
+        undo.undo()
+        await wait(1.2)
+
+        let sidebar = w.sidebar
+        guard let favorites = sidebar.groups.first(where: { $0.section == .favorites }) else { check("sidebar has Favorites", false); return }
+        _ = sidebar.outlineView(sidebar.outline, acceptDrop: SelfTestDrag([inner]), item: favorites, childIndex: 0)
+        await wait()
+        check("drop a folder on Favorites pins it", AppServices.shared.isFavorite(inner))
+        let node = sidebar.groups.first(where: { $0.section == .favorites })?.children.first { $0.url?.standardizedFileURL == inner.standardizedFileURL }
+        if let node {
+            _ = sidebar.outlineView(sidebar.outline, acceptDrop: SelfTestDrag([file]), item: node, childIndex: NSOutlineViewDropOnItemIndex)
+            await wait(1.2)
+            check("drop onto a Favorite moves into it", names(inner).contains(file.lastPathComponent) && !names(folder).contains(file.lastPathComponent))
+            undo.undo()
+            await wait(1.2)
+        } else {
+            check("pinned folder shows in the sidebar", false)
+        }
+        AppServices.shared.unpin(inner)
+    }
+
+    /// Waits until `condition` is true, up to `seconds`.
+    private static func waitFor(_ seconds: Double, _ condition: () -> Bool) async -> Bool {
+        for _ in 0..<Int(seconds * 10) {
+            if condition() { return true }
+            await wait(0.1)
+        }
+        return condition()
+    }
+
+    /// Milestone 5: the panel starts in the pane's folder, and Follow works both ways.
+    /// The shell runs the user's own zsh config; Luksfer's typed cd lines stay out of the history.
+    private static func terminal(in folder: URL, window w: BrowserWindowController) async {
+        let inner = folder.appendingPathComponent("New folder")
+        func same(_ a: URL?, _ b: URL) -> Bool { a?.resolvingSymlinksInPath().standardizedFileURL.path == b.resolvingSymlinksInPath().standardizedFileURL.path }
+        w.setTwoPanes(false)
+        w.activePane.navigate(to: folder)
+        await wait()
+        w.openTerminal(at: folder, focus: false)
+        guard let t = w.terminal else { check("terminal opens", false); return }
+        check("terminal starts in the pane's folder", await waitFor(15) { same(t.currentFolder, folder) && t.isAtIdlePrompt })
+        if !AppServices.shared.settings.terminalFollow { t.followEnabled = true }
+        w.activePane.navigate(to: inner)
+        check("Follow: opening a folder moves the shell", await waitFor(10) { same(t.currentFolder, inner) && t.isAtIdlePrompt })
+        t.type(" builtin cd -- '\(folder.path)'\r")
+        check("Follow: cd in the shell moves the pane", await waitFor(10) { same(w.activePane.folder, folder) })
+        t.focusTerminal()
+        await wait()
+        w.activePane.list.select([folder.appendingPathComponent("notes.md")], scroll: false)
+        let trash = NSMenuItem(title: "", action: #selector(BrowserWindowController.moveToTrash(_:)), keyEquivalent: "")
+        check("file actions are off while the terminal has focus", w.terminalHasFocus && !w.validateMenuItem(trash))
+        check("⌘Z in the terminal cannot undo a file action", w.window?.undoManager !== AppServices.shared.undoManager)
+        await wait(1.5)
+        if let window = w.window { DevHooks.grab(window, to: folder.deletingLastPathComponent().appendingPathComponent("terminal.png")) }
+        w.toggleTerminal(nil)
+        check("⌃` hides the terminal", !w.terminalOpen)
+        w.paneOpenTerminal(w.activePane)
+        check("“term” in the path bar opens the terminal", w.terminalOpen)
+        check("a terminal app to open is found", TerminalAppLauncher.applicationURL(for: .terminal) != nil)
+        w.closeTerminal()
+        // Leave two panes open for the LUKSFER_SELFTEST=restore run.
+        w.setTwoPanes(true, focus: false)
+        w.panes[1].navigate(to: inner)
+        await wait()
+    }
+
+    /// ⌘N opens a second window.
+    private static func newWindow() async {
+        let before = NSApp.windows.filter { $0.windowController is BrowserWindowController }.count
+        (NSApp.delegate as? AppDelegate)?.newWindow(nil)
+        await wait()
+        let after = NSApp.windows.filter { $0.windowController is BrowserWindowController && $0.isVisible }
+        check("⌘N opens a new window", after.count == before + 1)
+        after.last?.close()
+        await wait()
+    }
+
+    /// LUKSFER_SELFTEST=restore: the window from the last run comes back with two panes and its folders.
+    private static func restore() async {
+        await wait(1.5)
+        let windows = NSApp.windows.compactMap { $0.windowController as? BrowserWindowController }
+        check("one window comes back", windows.count == 1)
+        if let w = windows.first {
+            check("two panes come back", w.twoPanes)
+            check("left folder comes back", w.panes[0].folder.lastPathComponent == "folder")
+            check("right folder comes back", w.panes[1].folder.lastPathComponent == "New folder")
+        }
+        finish()
+    }
+
+    private static func run(in folder: URL) async {
+        await wait(1.5)
+        guard let w = NSApp.windows.compactMap({ $0.windowController as? BrowserWindowController }).first else { return }
+        let list = w.activePane.list
+        check("the file list has focus at launch", w.window?.firstResponder === list.tableView)
+        let undo = AppServices.shared.undoManager
+
+        w.newFolder(nil)
+        await wait()
+        check("new folder exists", names(folder).contains("New folder"))
+        check("new folder opens its name for typing", list.isRenaming)
+        w.window?.makeFirstResponder(list.tableView)   // leave the name as it is
+        await wait()
+
+        w.newTextFile(nil)
+        await wait()
+        w.window?.makeFirstResponder(list.tableView)
+        await wait()
+        check("new text file exists", names(folder).contains("New text file.txt"))
+
+        list.select([folder.appendingPathComponent("New text file.txt")], scroll: false)
+        w.copy(nil)
+        w.paste(nil)
+        await wait(1.2)
+        check("copy + paste in the same folder makes a copy", names(folder).contains("New text file copy.txt"))
+
+        FileActions.shared.rename(folder.appendingPathComponent("New text file copy.txt"), to: "notes.md", in: w)
+        await wait()
+        check("rename", names(folder).contains("notes.md") && !names(folder).contains("New text file copy.txt"))
+        undo.undo()
+        await wait()
+        check("undo rename", names(folder).contains("New text file copy.txt") && !names(folder).contains("notes.md"))
+        undo.redo()
+        await wait()
+        check("redo rename", names(folder).contains("notes.md"))
+
+        list.select([folder.appendingPathComponent("notes.md"), folder.appendingPathComponent("New folder")], scroll: false)
+        w.moveToTrash(nil)
+        await wait(1.2)
+        check("move to Trash", !names(folder).contains("notes.md") && !names(folder).contains("New folder"))
+        undo.undo()
+        await wait(1.2)
+        check("undo Trash puts both back", names(folder).isSuperset(of: ["notes.md", "New folder"]))
+        undo.redo()
+        await wait(1.2)
+        check("redo Trash", !names(folder).contains("notes.md"))
+        undo.undo()
+        await wait(1.2)
+
+        // Cut + paste moves into a folder; the clipboard is cleared after.
+        list.select([folder.appendingPathComponent("notes.md")], scroll: false)
+        w.cut(nil)
+        check("cut item is dimmed", list.dimmedURLs.contains { $0.lastPathComponent == "notes.md" })
+        FileActions.shared.paste(into: folder.appendingPathComponent("New folder"), in: w)
+        await wait(1.2)
+        check("cut + paste moves", names(folder.appendingPathComponent("New folder")).contains("notes.md") && !names(folder).contains("notes.md"))
+        undo.undo()
+        await wait(1.2)
+        check("undo move", names(folder).contains("notes.md"))
+
+        w.setTwoPanes(true)
+        w.otherPane.navigate(to: folder.appendingPathComponent("New folder"))
+        await wait()
+        FileActions.shared.transfer([folder.appendingPathComponent("notes.md")], into: folder.appendingPathComponent("New folder"), operation: .copy, in: w)
+        await wait(1.2)
+        check("copy to the other pane's folder", names(folder.appendingPathComponent("New folder")).contains("notes.md") && names(folder).contains("notes.md"))
+        check("other pane shows the copy", w.otherPane.list.items.contains { $0.name == "notes.md" })
+
+        await questions(in: folder, window: w)
+        await navigation(in: folder, window: w)
+        await drops(in: folder, window: w)
+        await newWindow()
+        await terminal(in: folder, window: w)
+
+        DevHooks.snapshot(to: folder.deletingLastPathComponent().appendingPathComponent("selftest.png"))
+        finish()
+    }
+}

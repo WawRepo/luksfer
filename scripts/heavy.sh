@@ -3,7 +3,7 @@
 # Every heavy command, from any session or subagent, goes through this script.
 # Usage: scripts/heavy.sh <command> [args...]
 set -u
-lock_root="$HOME/Library/Caches/okno-dev"
+lock_root="$HOME/Library/Caches/luksfer-dev"
 lock="$lock_root/heavy.lock"
 mkdir -p "$lock_root"
 waited=0

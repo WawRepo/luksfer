@@ -4,7 +4,7 @@ CLAUDE.local.md
 .env
 .env.*
 
-# Xcode and Swift Package Manager build output (builds go to ~/Library/Caches/okno-dev/)
+# Xcode and Swift Package Manager build output (builds go to ~/Library/Caches/luksfer-dev/)
 build/
 DerivedData/
 .build/
@@ -12,7 +12,7 @@ DerivedData/
 xcuserdata/
 *.xcuserstate
 
-# Test sandboxes (tests write only under ~/Library/Caches/okno-dev/)
+# Test sandboxes (tests write only under ~/Library/Caches/luksfer-dev/)
 sandbox/
 
 # OS

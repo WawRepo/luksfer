@@ -3,13 +3,13 @@
 Oct 30, 2026 · Mac: Apple Silicon, macOS 26, Xcode 27, Swift 6.4
 
 The spike code is in `Spike/main.swift`. Run it with
-`scripts/build.sh -c release --product OknoSpike`, then
-`~/Library/Caches/okno-dev/build/okno/release/OknoSpike <check>`. Every write goes to
-`~/Library/Caches/okno-dev/sandbox/`.
+`scripts/build.sh -c release --product LuksferSpike`, then
+`~/Library/Caches/luksfer-dev/build/luksfer/release/LuksferSpike <check>`. Every write goes to
+`~/Library/Caches/luksfer-dev/sandbox/`.
 
 ## Result
 
-Every risky part works on this Mac. Okno is built with **Swift and AppKit**, with **SwiftTerm**
+Every risky part works on this Mac. Luksfer is built with **Swift and AppKit**, with **SwiftTerm**
 for the terminal. One finding changes the design: the app lists folders with `readdir` + `fstatat`,
 not with Foundation's URL resource keys, because the cloud-status keys are 33 times slower.
 
@@ -67,7 +67,7 @@ icon was drawn, and then each "only in the cloud" file was checked again.
   pseudo-terminal (a fake keyboard-and-screen device the shell talks to).
 - The login shell (`/bin/zsh`, started as `-zsh`) ran with the user's own startup files, prompt
   theme and colors. Resize works (102 to 70 columns).
-- **Folder tracking works.** Okno points `ZDOTDIR` at its own small startup files. They load the
+- **Folder tracking works.** Luksfer points `ZDOTDIR` at its own small startup files. They load the
   user's files first, then add two hooks:
   - OSC 7 (an escape code that reports the shell's folder) after every command.
   - A private OSC 6973 mark: `prompt` when the shell waits, `exec` when a command starts.
@@ -83,9 +83,9 @@ icon was drawn, and then each "only in the cloud" file was checked again.
 - Files go on the pasteboard as `NSURL` objects (`public.file-url`), one item per file. Read back
   from a private pasteboard: 2 of 2 paths, and the old `NSFilenamesPboardType` that older apps
   read also works. This is the format Finder writes and reads.
-- A cut is a normal file copy plus a private marker type (`app.okno.cut`). Okno moves on paste when
+- A cut is a normal file copy plus a private marker type (`io.github.wawrepo.luksfer.cut`). Luksfer moves on paste when
   the marker is there. Finder ignores the marker, so a cut pasted in Finder becomes a copy (PRD §6.6).
-- Drag and drop uses the same pasteboard data. A real drag between Okno and Finder can only be done
+- Drag and drop uses the same pasteboard data. A real drag between Luksfer and Finder can only be done
   by hand; it is checked in milestone 4.
 
 ## 5. Default file viewer ("Show in Finder")
@@ -94,10 +94,10 @@ icon was drawn, and then each "only in the cloud" file was checked again.
   viewer). AppKit's `NSWorkspace` "reveal" calls (`activateFileViewerSelecting`,
   `selectFile(_:inFileViewerRootedAtPath:)`) send the request to that app instead of Finder.
 - Apps that tell Finder directly (AppleScript, `open -R` on some versions) still go to Finder. So
-  "Show in Finder" reaches Okno only from apps that ask macOS for the file viewer, as the PRD expects.
+  "Show in Finder" reaches Luksfer only from apps that ask macOS for the file viewer, as the PRD expects.
 - Not set on this Mac (`NSFileViewer` does not exist). The spike did not change it: it is a global
   setting, and changing it is the user's choice in milestone 6. That milestone adds an opt-in
-  switch and tests the exact request Okno receives.
+  switch and tests the exact request Luksfer receives.
 
 ## Stack choice
 
@@ -107,7 +107,7 @@ icon was drawn, and then each "only in the cloud" file was checked again.
 | UI | AppKit. View-based `NSTableView` for the file list. SwiftUI only for Settings. |
 | Listing | `readdir` + `fstatat` on a background queue; type from the extension (cached `UTType`); cloud status from `SF_DATALESS`; type icons only |
 | Terminal | SwiftTerm `LocalProcessTerminalView`; zsh integration through `ZDOTDIR` (OSC 7 + OSC 6973) |
-| Project | Swift Package (no Xcode project): `OknoCore` (logic, unit tests), `Okno` (app), `OknoSpike` |
-| App bundle | `scripts/build-app.sh` builds `Okno.app` in `~/Library/Caches/okno-dev/dist/` |
-| Builds | `scripts/build.sh` (through `scripts/heavy.sh`: one heavy job at a time, `-j 6`), output in `~/Library/Caches/okno-dev/build/` |
-| Settings | JSON in `~/Library/Application Support/Okno/` |
+| Project | Swift Package (no Xcode project): `LuksferCore` (logic, unit tests), `Luksfer` (app), `LuksferSpike` |
+| App bundle | `scripts/build-app.sh` builds `Luksfer.app` in `~/Library/Caches/luksfer-dev/dist/` |
+| Builds | `scripts/build.sh` (through `scripts/heavy.sh`: one heavy job at a time, `-j 6`), output in `~/Library/Caches/luksfer-dev/build/` |
+| Settings | JSON in `~/Library/Application Support/Luksfer/` |

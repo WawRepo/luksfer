@@ -1,18 +1,18 @@
-// Okno spike: measurements and checks that decide the stack.
+// Luksfer spike: measurements and checks that decide the stack.
 //
-//   swift run OknoSpike list10k          10,000-item folder: list + fill an NSTableView + scroll pass
-//   swift run OknoSpike drive <folder>   read-only listing of a cloud folder; checks nothing downloads
-//   swift run OknoSpike term             SwiftTerm panel with the login shell, OSC 7 and prompt marks
-//   swift run OknoSpike pasteboard       file URLs on a private pasteboard, as Finder reads them
+//   swift run LuksferSpike list10k          10,000-item folder: list + fill an NSTableView + scroll pass
+//   swift run LuksferSpike drive <folder>   read-only listing of a cloud folder; checks nothing downloads
+//   swift run LuksferSpike term             SwiftTerm panel with the login shell, OSC 7 and prompt marks
+//   swift run LuksferSpike pasteboard       file URLs on a private pasteboard, as Finder reads them
 //
-// Every write goes to ~/Library/Caches/okno-dev/sandbox/. Real folders are only read.
+// Every write goes to ~/Library/Caches/luksfer-dev/sandbox/. Real folders are only read.
 
 import AppKit
 import SwiftTerm
 import UniformTypeIdentifiers
 
 let sandboxRoot = URL(fileURLWithPath: NSHomeDirectory())
-    .appendingPathComponent("Library/Caches/okno-dev/sandbox", isDirectory: true)
+    .appendingPathComponent("Library/Caches/luksfer-dev/sandbox", isDirectory: true)
 
 func ms(_ seconds: Double) -> String { String(format: "%.1f ms", seconds * 1000) }
 
@@ -449,7 +449,7 @@ func runDrive(_ folder: String) throws {
         var env = Terminal.getEnvironmentVariables(termName: "xterm-256color")
         env.removeAll { $0.hasPrefix("ZDOTDIR=") }
         let userZdot = ProcessInfo.processInfo.environment["ZDOTDIR"] ?? NSHomeDirectory()
-        env += ["ZDOTDIR=\(zdot.path)", "OKNO_USER_ZDOTDIR=\(userZdot)", "TERM_PROGRAM=Okno",
+        env += ["ZDOTDIR=\(zdot.path)", "LUKSFER_USER_ZDOTDIR=\(userZdot)", "TERM_PROGRAM=Luksfer",
                 "HOME=\(NSHomeDirectory())", "USER=\(NSUserName())", "PATH=\(ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin")"]
         let shell = String(cString: getpwuid(getuid()).pointee.pw_shell)
         events.append("shell: \(shell) (login)")
@@ -510,26 +510,26 @@ func runDrive(_ folder: String) throws {
 func writeShellIntegration(to dir: URL) throws {
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     let common = #"""
-    # Okno shell integration (spike copy).
-    __okno_source() {
-      local f="${OKNO_USER_ZDOTDIR:-$HOME}/$1"
+    # Luksfer shell integration (spike copy).
+    __luksfer_source() {
+      local f="${LUKSFER_USER_ZDOTDIR:-$HOME}/$1"
       if [[ -r "$f" ]]; then
-        ZDOTDIR="${OKNO_USER_ZDOTDIR:-$HOME}"
+        ZDOTDIR="${LUKSFER_USER_ZDOTDIR:-$HOME}"
         source "$f"
-        OKNO_USER_ZDOTDIR="$ZDOTDIR"
-        ZDOTDIR="$__okno_zdotdir"
+        LUKSFER_USER_ZDOTDIR="$ZDOTDIR"
+        ZDOTDIR="$__luksfer_zdotdir"
       fi
     }
     """#
     let zshenv = #"""
-    __okno_zdotdir="$ZDOTDIR"
+    __luksfer_zdotdir="$ZDOTDIR"
     \#(common)
-    __okno_source .zshenv
+    __luksfer_source .zshenv
     """#
-    let zprofile = "__okno_source .zprofile\n"
+    let zprofile = "__luksfer_source .zprofile\n"
     let zshrc = #"""
-    __okno_source .zshrc
-    __okno_cwd() {
+    __luksfer_source .zshrc
+    __luksfer_cwd() {
       local LC_ALL=C i c out=""
       for (( i = 1; i <= ${#PWD}; i++ )); do
         c="${PWD[i]}"
@@ -537,14 +537,14 @@ func writeShellIntegration(to dir: URL) throws {
       done
       printf '\e]7;file://%s%s\a' "$HOST" "$out"
     }
-    __okno_precmd() { __okno_cwd; printf '\e]6973;prompt\a'; }
-    __okno_preexec() { printf '\e]6973;exec\a'; }
+    __luksfer_precmd() { __luksfer_cwd; printf '\e]6973;prompt\a'; }
+    __luksfer_preexec() { printf '\e]6973;exec\a'; }
     autoload -Uz add-zsh-hook
-    add-zsh-hook precmd __okno_precmd
-    add-zsh-hook preexec __okno_preexec
+    add-zsh-hook precmd __luksfer_precmd
+    add-zsh-hook preexec __luksfer_preexec
     # Hand ZDOTDIR back so .zlogin and child shells use the user's own files.
-    if [[ "$OKNO_USER_ZDOTDIR" == "$HOME" ]]; then unset ZDOTDIR; else ZDOTDIR="$OKNO_USER_ZDOTDIR"; fi
-    unset OKNO_USER_ZDOTDIR __okno_zdotdir
+    if [[ "$LUKSFER_USER_ZDOTDIR" == "$HOME" ]]; then unset ZDOTDIR; else ZDOTDIR="$LUKSFER_USER_ZDOTDIR"; fi
+    unset LUKSFER_USER_ZDOTDIR __luksfer_zdotdir
     """#
     for (name, text) in [(".zshenv", zshenv), (".zprofile", zprofile), (".zshrc", zshrc)] {
         try text.write(to: dir.appendingPathComponent(name), atomically: true, encoding: .utf8)
@@ -574,9 +574,9 @@ func runPasteboard() throws {
     for f in files { fm.createFile(atPath: f.path, contents: Data("x".utf8)) }
 
     // A private, named pasteboard: the user's clipboard is never touched.
-    let pb = NSPasteboard(name: .init("okno.spike.\(getpid())"))
+    let pb = NSPasteboard(name: .init("luksfer.spike.\(getpid())"))
     pb.clearContents()
-    let cutType = NSPasteboard.PasteboardType("app.okno.cut")
+    let cutType = NSPasteboard.PasteboardType("io.github.wawrepo.luksfer.cut")
     let ok = pb.writeObjects(files.map { $0 as NSURL })
     pb.addTypes([cutType], owner: nil)
     pb.setString("1", forType: cutType)
@@ -598,12 +598,12 @@ do {
     case "list10k": try runList10k()
     case "list-ways": try runListWays()
     case "drive":
-        guard args.count >= 2 else { print("usage: OknoSpike drive <folder>"); exit(2) }
+        guard args.count >= 2 else { print("usage: LuksferSpike drive <folder>"); exit(2) }
         try runDrive(args[args.startIndex + 1])
     case "term": try runTerm()
     case "pasteboard": try runPasteboard()
     default:
-        print("usage: OknoSpike list10k | drive <folder> | term | pasteboard")
+        print("usage: LuksferSpike list10k | drive <folder> | term | pasteboard")
         exit(2)
     }
 } catch {
