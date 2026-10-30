@@ -30,7 +30,7 @@ final class FileActions {
 
     private func write(_ urls: [URL], cut: Bool) {
         guard !urls.isEmpty else { return }
-        let pb = NSPasteboard.general
+        let pb = FileClipboard.pasteboard
         pb.clearContents()
         pb.writeObjects(urls.map { $0 as NSURL })
         if cut {
@@ -44,13 +44,13 @@ final class FileActions {
 
     /// The cut items still waiting for a paste (empty once another app changed the clipboard).
     var pendingCut: Set<URL> {
-        NSPasteboard.general.changeCount == cutChangeCount ? cutURLs : []
+        FileClipboard.pasteboard.changeCount == cutChangeCount ? cutURLs : []
     }
 
     /// Pastes the clipboard's files into `folder`: a cut moves them, a copy copies them.
     /// `forceMove` is Finder's ⌥⌘V.
     func paste(into folder: URL, forceMove: Bool = false, in window: BrowserWindowController) {
-        let pb = NSPasteboard.general
+        let pb = FileClipboard.pasteboard
         guard let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL], !urls.isEmpty else {
             NSSound.beep()
             return
@@ -60,7 +60,7 @@ final class FileActions {
         transfer(urls, into: folder, operation: move ? .move : .copy, in: window) { [weak self] in
             // After a cut is pasted, the clipboard no longer holds it (like Explorer).
             guard let self, isCut else { return }
-            if NSPasteboard.general.changeCount == self.cutChangeCount { NSPasteboard.general.clearContents() }
+            if FileClipboard.pasteboard.changeCount == self.cutChangeCount { FileClipboard.pasteboard.clearContents() }
             self.cutURLs = []
             NotificationCenter.default.post(name: .oknoCutChanged, object: nil)
         }

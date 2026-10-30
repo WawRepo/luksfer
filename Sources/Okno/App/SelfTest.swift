@@ -8,6 +8,10 @@ import Quartz
 @MainActor
 enum SelfTest {
     static func scheduleIfAsked() {
+        if ProcessInfo.processInfo.environment["OKNO_SELFTEST"] == "restore" {
+            Task { await restore() }
+            return
+        }
         guard ProcessInfo.processInfo.environment["OKNO_SELFTEST"] == "1",
               ProcessInfo.processInfo.environment["OKNO_TRASH_DIR"] != nil,
               let folder = DevHooks.openFolder else { return }
@@ -27,6 +31,15 @@ enum SelfTest {
 
     private static func wait(_ seconds: Double = 0.6) async { try? await Task.sleep(for: .seconds(seconds)) }
 
+    /// Prints the result and quits, also when a sheet is still open. Exit code 1 on a failure.
+    private static func finish() {
+        FileHandle.standardError.write(Data("selftest: \(failures == 0 ? "ALL PASSED" : "\(failures) FAILED")\n".utf8))
+        if failures > 0 { exit(1) }
+        for w in NSApp.windows { if let sheet = w.attachedSheet { w.endSheet(sheet) } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { exit(0) }
+        NSApp.terminate(nil)   // saves the window state, for OKNO_SELFTEST=restore
+    }
+
     /// Sends a key press to the view, as if typed.
     private static func key(_ code: Int, _ flags: NSEvent.ModifierFlags = [], to view: NSView) {
         let chars = String(Character(UnicodeScalar(UInt32(code))!))
@@ -44,15 +57,23 @@ enum SelfTest {
         return nil
     }
 
+    private static func sheetText(_ view: NSView?) -> String {
+        guard let view else { return "" }
+        let own = (view as? NSButton)?.title ?? (view as? NSTextField)?.stringValue ?? ""
+        return ([own] + view.subviews.map(sheetText)).filter { !$0.isEmpty }.joined(separator: " | ")
+    }
+
     /// Waits for a sheet on the window and clicks its button. False when no sheet came.
     private static func answer(_ title: String, on window: NSWindow?) async -> Bool {
-        for _ in 0..<30 {
+        for _ in 0..<100 {
             if let sheet = window?.attachedSheet, let b = button(title, in: sheet.contentView) {
                 b.performClick(nil)
                 return true
             }
             await wait(0.1)
         }
+        let open = window?.attachedSheet.map { sheetText($0.contentView) } ?? "no sheet"
+        FileHandle.standardError.write(Data("selftest: no “\(title)” button; open: \(open)\n".utf8))
         return false
     }
 
@@ -150,6 +171,88 @@ enum SelfTest {
         w.setActive(0)
     }
 
+    /// Milestone 4: drops between panes, onto a folder row, onto the sidebar, and ⌥ copy.
+    private static func drops(in folder: URL, window w: BrowserWindowController) async {
+        let inner = folder.appendingPathComponent("New folder")
+        let file = folder.appendingPathComponent("New text file.txt")
+        let undo = AppServices.shared.undoManager
+        w.setTwoPanes(true, focus: false)
+        w.setActive(0)
+        w.panes[0].navigate(to: folder)
+        w.panes[1].navigate(to: inner)
+        await wait()
+        let left = w.panes[0].list, right = w.panes[1].list
+
+        let drag = SelfTestDrag([file])
+        check("drop into the other pane is allowed", right.tableView(right.tableView, validateDrop: drag, proposedRow: -1, proposedDropOperation: .above) == .move)
+        check("drop into its own folder does nothing", left.tableView(left.tableView, validateDrop: drag, proposedRow: -1, proposedDropOperation: .above) == [])
+        let folderDrag = SelfTestDrag([inner])
+        let innerRow = left.items.firstIndex { $0.name == "New folder" } ?? -1
+        check("drop of a folder into itself is refused", left.tableView(left.tableView, validateDrop: folderDrag, proposedRow: innerRow, proposedDropOperation: .on) == [])
+
+        _ = right.tableView(right.tableView, acceptDrop: drag, row: -1, dropOperation: .above)
+        await wait(1.2)
+        check("drag to the other pane moves (same disk)", names(inner).contains(file.lastPathComponent) && !names(folder).contains(file.lastPathComponent))
+        check("both panes show the move", right.items.contains { $0.name == file.lastPathComponent } && !left.items.contains { $0.name == file.lastPathComponent })
+        undo.undo()
+        await wait(1.2)
+        check("undo the drag", names(folder).contains(file.lastPathComponent) && !names(inner).contains(file.lastPathComponent))
+
+        _ = right.tableView(right.tableView, acceptDrop: SelfTestDrag([file], mask: .copy), row: -1, dropOperation: .above)
+        await wait(1.2)
+        check("⌥ drag copies", names(inner).contains(file.lastPathComponent) && names(folder).contains(file.lastPathComponent))
+        undo.undo()
+        await wait(1.2)
+
+        let row = left.items.firstIndex { $0.name == "New folder" } ?? -1
+        _ = left.tableView(left.tableView, acceptDrop: SelfTestDrag([file]), row: row, dropOperation: .on)
+        await wait(1.2)
+        check("drop onto a folder row moves into it", names(inner).contains(file.lastPathComponent) && !names(folder).contains(file.lastPathComponent))
+        undo.undo()
+        await wait(1.2)
+
+        let sidebar = w.sidebar
+        guard let favorites = sidebar.groups.first(where: { $0.section == .favorites }) else { check("sidebar has Favorites", false); return }
+        _ = sidebar.outlineView(sidebar.outline, acceptDrop: SelfTestDrag([inner]), item: favorites, childIndex: 0)
+        await wait()
+        check("drop a folder on Favorites pins it", AppServices.shared.isFavorite(inner))
+        let node = sidebar.groups.first(where: { $0.section == .favorites })?.children.first { $0.url?.standardizedFileURL == inner.standardizedFileURL }
+        if let node {
+            _ = sidebar.outlineView(sidebar.outline, acceptDrop: SelfTestDrag([file]), item: node, childIndex: NSOutlineViewDropOnItemIndex)
+            await wait(1.2)
+            check("drop onto a Favorite moves into it", names(inner).contains(file.lastPathComponent) && !names(folder).contains(file.lastPathComponent))
+            undo.undo()
+            await wait(1.2)
+        } else {
+            check("pinned folder shows in the sidebar", false)
+        }
+        AppServices.shared.unpin(inner)
+    }
+
+    /// ⌘N opens a second window.
+    private static func newWindow() async {
+        let before = NSApp.windows.filter { $0.windowController is BrowserWindowController }.count
+        (NSApp.delegate as? AppDelegate)?.newWindow(nil)
+        await wait()
+        let after = NSApp.windows.filter { $0.windowController is BrowserWindowController && $0.isVisible }
+        check("⌘N opens a new window", after.count == before + 1)
+        after.last?.close()
+        await wait()
+    }
+
+    /// OKNO_SELFTEST=restore: the window from the last run comes back with two panes and its folders.
+    private static func restore() async {
+        await wait(1.5)
+        let windows = NSApp.windows.compactMap { $0.windowController as? BrowserWindowController }
+        check("one window comes back", windows.count == 1)
+        if let w = windows.first {
+            check("two panes come back", w.twoPanes)
+            check("left folder comes back", w.panes[0].folder.lastPathComponent == "folder")
+            check("right folder comes back", w.panes[1].folder.lastPathComponent == "New folder")
+        }
+        finish()
+    }
+
     private static func run(in folder: URL) async {
         await wait(1.5)
         guard let w = NSApp.windows.compactMap({ $0.windowController as? BrowserWindowController }).first else { return }
@@ -170,12 +273,10 @@ enum SelfTest {
         check("new text file exists", names(folder).contains("New text file.txt"))
 
         list.select([folder.appendingPathComponent("New text file.txt")], scroll: false)
-        let pasteboardBefore = NSPasteboard.general.changeCount
         w.copy(nil)
         w.paste(nil)
         await wait(1.2)
         check("copy + paste in the same folder makes a copy", names(folder).contains("New text file copy.txt"))
-        _ = pasteboardBefore
 
         FileActions.shared.rename(folder.appendingPathComponent("New text file copy.txt"), to: "notes.md", in: w)
         await wait()
@@ -221,9 +322,10 @@ enum SelfTest {
 
         await questions(in: folder, window: w)
         await navigation(in: folder, window: w)
+        await drops(in: folder, window: w)
+        await newWindow()
 
         DevHooks.snapshot(to: folder.deletingLastPathComponent().appendingPathComponent("selftest.png"))
-        FileHandle.standardError.write(Data("selftest: \(failures == 0 ? "ALL PASSED" : "\(failures) FAILED")\n".utf8))
-        NSApp.terminate(nil)
+        finish()
     }
 }

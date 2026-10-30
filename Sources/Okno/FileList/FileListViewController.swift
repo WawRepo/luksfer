@@ -320,18 +320,18 @@ extension FileListViewController: NSTableViewDataSource, NSTableViewDelegate {
     func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int,
                    proposedDropOperation dropOperation: NSTableView.DropOperation) -> NSDragOperation {
         guard let target = dropTarget(row: row, operation: dropOperation, tableView: tableView),
-              let urls = droppedURLs(info), !urls.isEmpty else { return [] }
+              let urls = info.fileURLs, !urls.isEmpty else { return [] }
         // Dropping items into the folder they are already in does nothing.
         if urls.allSatisfy({ $0.deletingLastPathComponent().standardizedFileURL == target.standardizedFileURL }) { return [] }
         if urls.contains(where: { target.standardizedFileURL.path.hasPrefix($0.standardizedFileURL.path + "/") || target.standardizedFileURL == $0.standardizedFileURL }) { return [] }
-        return dragOperation(for: urls, into: target, info: info) == .copy ? .copy : .move
+        return info.fileOperation(for: urls, into: target) == .copy ? .copy : .move
     }
 
     func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int,
                    dropOperation: NSTableView.DropOperation) -> Bool {
         guard let target = dropTarget(row: row, operation: dropOperation, tableView: tableView),
-              let urls = droppedURLs(info), !urls.isEmpty else { return false }
-        return delegate?.fileList(self, drop: urls, into: target, operation: dragOperation(for: urls, into: target, info: info)) ?? false
+              let urls = info.fileURLs, !urls.isEmpty else { return false }
+        return delegate?.fileList(self, drop: urls, into: target, operation: info.fileOperation(for: urls, into: target)) ?? false
     }
 
     /// A folder row under the pointer, or else the current folder (the drop retargets to the whole list).
@@ -341,18 +341,6 @@ extension FileListViewController: NSTableViewDataSource, NSTableViewDelegate {
         }
         tableView.setDropRow(-1, dropOperation: .on)
         return folder
-    }
-
-    private func droppedURLs(_ info: NSDraggingInfo) -> [URL]? {
-        info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
-    }
-
-    private func dragOperation(for urls: [URL], into target: URL, info: NSDraggingInfo) -> DropOperation {
-        let flags = NSEvent.modifierFlags
-        let mask = info.draggingSourceOperationMask
-        if !mask.contains(.move) && !mask.contains(.generic) { return .copy }
-        let same = urls.first.map { DropRule.sameVolume($0, target) } ?? true
-        return DropRule.operation(sameVolume: same, option: flags.contains(.option), command: flags.contains(.command))
     }
 }
 

@@ -41,8 +41,8 @@ final class SidebarNode: NSObject {
 /// The sidebar: Favorites (pin, reorder, rename, unpin), This Mac, and Locations (PRD §6.4).
 final class SidebarViewController: NSViewController {
     weak var delegate: SidebarDelegate?
-    private let outline = NSOutlineView()
-    private var groups: [SidebarNode] = []
+    let outline = NSOutlineView()
+    private(set) var groups: [SidebarNode] = []
     private var editingFavorites = false
     private var selectingProgrammatically = false
     private var currentFolder: URL?
@@ -358,7 +358,7 @@ extension SidebarViewController: NSOutlineViewDataSource, NSOutlineViewDelegate 
         if info.draggingPasteboard.string(forType: Self.favoriteType) != nil {
             return node?.section == .favorites && index >= 0 ? .move : []
         }
-        guard let urls = fileURLs(info), !urls.isEmpty else { return [] }
+        guard let urls = info.fileURLs, !urls.isEmpty else { return [] }
         if node?.section == .favorites {
             // Between favorites (or on the header): pin the dropped folders.
             guard urls.contains(where: isFolder) else { return [] }
@@ -367,7 +367,7 @@ extension SidebarViewController: NSOutlineViewDataSource, NSOutlineViewDelegate 
         }
         guard let node, let target = node.url, index == NSOutlineViewDropOnItemIndex else { return [] }
         if urls.allSatisfy({ $0.deletingLastPathComponent().standardizedFileURL == target.standardizedFileURL }) { return [] }
-        return operation(for: urls, into: target, info: info) == .copy ? .copy : .move
+        return info.fileOperation(for: urls, into: target) == .copy ? .copy : .move
     }
 
     func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo, item: Any?, childIndex index: Int) -> Bool {
@@ -380,28 +380,18 @@ extension SidebarViewController: NSOutlineViewDataSource, NSOutlineViewDelegate 
             }
             return true
         }
-        guard let urls = fileURLs(info) else { return false }
+        guard let urls = info.fileURLs else { return false }
         if node?.section == .favorites {
             AppServices.shared.pin(urls.filter(isFolder), at: index >= 0 ? index : nil)
             return true
         }
         guard let target = node?.url else { return false }
-        return delegate?.sidebar(self, drop: urls, into: target, operation: operation(for: urls, into: target, info: info)) ?? false
-    }
-
-    private func fileURLs(_ info: NSDraggingInfo) -> [URL]? {
-        info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
+        return delegate?.sidebar(self, drop: urls, into: target, operation: info.fileOperation(for: urls, into: target)) ?? false
     }
 
     private func isFolder(_ url: URL) -> Bool {
         var dir: ObjCBool = false
         return FileManager.default.fileExists(atPath: url.path, isDirectory: &dir) && dir.boolValue
-    }
-
-    private func operation(for urls: [URL], into target: URL, info: NSDraggingInfo) -> DropOperation {
-        let flags = NSEvent.modifierFlags
-        let same = urls.first.map { DropRule.sameVolume($0, target) } ?? true
-        return DropRule.operation(sameVolume: same, option: flags.contains(.option), command: flags.contains(.command))
     }
 }
 

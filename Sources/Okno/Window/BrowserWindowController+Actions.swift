@@ -241,8 +241,11 @@ extension BrowserWindowController: NSToolbarDelegate {
 /// Files on the general pasteboard (for Paste), and the cut marker (PRD §6.6).
 enum FileClipboard {
     static let cutType = NSPasteboard.PasteboardType("app.okno.cut")
+    /// The general pasteboard. Self-test runs use a private one, so the user's clipboard stays as it is.
+    static let pasteboard: NSPasteboard = ProcessInfo.processInfo.environment["OKNO_SELFTEST"] != nil
+        ? NSPasteboard(name: .init("app.okno.selftest")) : .general
 
     static var hasFiles: Bool {
-        NSPasteboard.general.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+        pasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
     }
 }
