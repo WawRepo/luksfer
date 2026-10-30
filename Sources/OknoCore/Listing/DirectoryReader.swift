@@ -9,6 +9,12 @@ public enum DirectoryReader {
     static let datalessFlag: UInt32 = 0x4000_0000
 
     public static func read(_ folder: URL, includeHidden: Bool) throws -> [FileItem] {
+        // The app turns off downloads of cloud-only items for the whole process. A cloud folder
+        // whose list is not on this Mac yet must still fetch its names, so allow that for this
+        // thread while it lists. readdir and fstatat never read file contents.
+        let previous = getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD)
+        setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, IOPOL_MATERIALIZE_DATALESS_FILES_ON)
+        defer { setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, previous >= 0 ? previous : IOPOL_MATERIALIZE_DATALESS_FILES_DEFAULT) }
         let path = folder.path
         guard let dir = opendir(path) else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         defer { closedir(dir) }

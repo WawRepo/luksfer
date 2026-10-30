@@ -79,15 +79,6 @@ extension BrowserWindowController: NSMenuItemValidation {
         }
     }
 
-    // MARK: File actions (filled in by )
-
-    @objc func renameSelection(_ sender: Any?) {
-        guard let item = activePane.list.selectedItems.first else { return }
-        activePane.list.beginRename(item.url)
-    }
-
-    @objc func moveToTrash(_ sender: Any?) { NSSound.beep() }
-    @objc func deleteImmediately(_ sender: Any?) { NSSound.beep() }
 
     // MARK: Validation
 
@@ -120,8 +111,21 @@ extension BrowserWindowController: NSMenuItemValidation {
             return !editingText && !selection.isEmpty
         case #selector(renameSelection(_:)):
             return !editingText && selection.count == 1
-        case #selector(moveToTrash(_:)), #selector(deleteImmediately(_:)):
+        case #selector(moveToTrash(_:)), #selector(deleteImmediately(_:)), #selector(cut(_:)), #selector(copy(_:)),
+             #selector(duplicateItems(_:)), #selector(compressItems(_:)):
             return !editingText && !selection.isEmpty
+        case #selector(paste(_:)), #selector(pasteMove(_:)):
+            return !editingText && FileClipboard.hasFiles
+        case #selector(pasteInto(_:)):
+            return FileClipboard.hasFiles
+        case #selector(newFolder(_:)), #selector(newTextFile(_:)), #selector(newMarkdownFile(_:)), #selector(getInfo(_:)):
+            return !editingText
+        case #selector(sortBy(_:)):
+            let order = activePane.list.sortOrder
+            let keys = SortKey.allCases
+            if item.tag < keys.count { item.state = order.key == keys[item.tag] ? .on : .off }
+            else { item.state = (item.tag == 100) == order.ascending ? .on : .off }
+            return true
         case #selector(pinToFavorites(_:)):
             let folders = selection.filter(\.isFolder).map(\.url)
             let targets = folders.isEmpty ? [activePane.folder] : folders
@@ -175,14 +179,14 @@ extension BrowserWindowController: NSToolbarDelegate {
             item.toolTip = "New folder or file"
             item.showsIndicator = true
             let menu = NSMenu()
-            menu.addItem(NSMenuItem(title: "New Folder", action: Selector(("newFolder:")), keyEquivalent: ""))
-            menu.addItem(NSMenuItem(title: "New Text File", action: Selector(("newTextFile:")), keyEquivalent: ""))
-            menu.addItem(NSMenuItem(title: "New Markdown File", action: Selector(("newMarkdownFile:")), keyEquivalent: ""))
+            menu.addItem(NSMenuItem(title: "New Folder", action: #selector(newFolder(_:)), keyEquivalent: ""))
+            menu.addItem(NSMenuItem(title: "New Text File", action: #selector(newTextFile(_:)), keyEquivalent: ""))
+            menu.addItem(NSMenuItem(title: "New Markdown File", action: #selector(newMarkdownFile(_:)), keyEquivalent: ""))
             item.menu = menu
             return item
-        case .cut: return button(id, "Cut", "scissors", Selector(("cut:")), "Cut (⌘X)")
-        case .copy: return button(id, "Copy", "doc.on.doc", Selector(("copy:")), "Copy (⌘C)")
-        case .paste: return button(id, "Paste", "doc.on.clipboard", Selector(("paste:")), "Paste (⌘V)")
+        case .cut: return button(id, "Cut", "scissors", #selector(cut(_:)), "Cut (⌘X)")
+        case .copy: return button(id, "Copy", "doc.on.doc", #selector(copy(_:)), "Copy (⌘C)")
+        case .paste: return button(id, "Paste", "doc.on.clipboard", #selector(paste(_:)), "Paste (⌘V)")
         case .rename: return button(id, "Rename", "pencil", #selector(renameSelection(_:)), "Rename (F2)")
         case .trash: return button(id, "Trash", "trash", #selector(moveToTrash(_:)), "Move to Trash (⌘⌫)")
         case .terminal:

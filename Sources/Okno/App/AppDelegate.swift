@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
         DevHooks.scheduleSnapshot()
         DevHooks.scheduleBench()
+        SelfTest.scheduleIfAsked()
     }
 
     @discardableResult

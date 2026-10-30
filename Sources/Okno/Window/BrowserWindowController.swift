@@ -64,6 +64,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return event
         }
         statusBar.onStop = { [weak self] in self?.stopOperation() }
+        let nc = NotificationCenter.default
+        nc.addObserver(self, selector: #selector(settingsChanged), name: .oknoSettingsChanged, object: nil)
+        nc.addObserver(self, selector: #selector(cutChanged), name: .oknoCutChanged, object: nil)
+        applyKeyMode()
         if state?.terminalOpen == true {
             DispatchQueue.main.async { self.openTerminal(at: self.activePane.folder, focus: false) }
         }
@@ -289,8 +293,27 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     func windowDidBecomeKey(_ notification: Notification) { updateToolbar() }
 
-    // Overridden by the file actions when an operation runs.
     @objc func stopOperation() { FileActions.shared.cancelCurrent() }
+
+    private var lastShowHidden: Bool?
+
+    @objc private func settingsChanged() {
+        let hidden = AppServices.shared.settings.showHidden
+        if lastShowHidden != nil && lastShowHidden != hidden { panes.forEach { $0.reload() } }
+        lastShowHidden = hidden
+        applyKeyMode()
+    }
+
+    private func applyKeyMode() {
+        lastShowHidden = lastShowHidden ?? AppServices.shared.settings.showHidden
+        let finder = AppServices.shared.settings.keyMode == .finder
+        panes.forEach { $0.list.tableView.enterRenames = finder }
+    }
+
+    @objc private func cutChanged() {
+        let cut = FileActions.shared.pendingCut
+        panes.forEach { $0.list.dimmedURLs = cut }
+    }
 }
 
 // MARK: - Pane events
