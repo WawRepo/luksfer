@@ -59,6 +59,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var columns: [ColumnState] = []
     public var windows: [WindowState] = []
     public var collapsedSidebarSections: [String] = []
+    /// Network drives in the sidebar. Their passwords are in the Keychain, never here.
+    public var networkDrives: [NetworkDrive] = []
 
     public init() {}
 
@@ -83,6 +85,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         columns = try c.decodeIfPresent([ColumnState].self, forKey: .columns) ?? []
         windows = try c.decodeIfPresent([WindowState].self, forKey: .windows) ?? []
         collapsedSidebarSections = try c.decodeIfPresent([String].self, forKey: .collapsedSidebarSections) ?? []
+        networkDrives = try c.decodeIfPresent([NetworkDrive].self, forKey: .networkDrives) ?? []
     }
 }
 
