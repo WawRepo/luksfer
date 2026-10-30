@@ -15,6 +15,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private(set) var terminalOpen = false
     private var shellExited = false
     private var terminalHeight: CGFloat = 240
+    private let terminalUndoManager = UndoManager()
     let statusBar = StatusBarView()
     private var mouseMonitor: Any?
     var toolbarButtons: [NSToolbarItem.Identifier: NSControl] = [:]
@@ -58,6 +59,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         setTwoPanes(twoPanes, focus: false)
         setActive(activeIndex)
+        // Keys work in the list from the start (not in the sidebar or the search box).
+        window.initialFirstResponder = activePane.list.tableView
 
         mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             self?.activatePane(at: event)
@@ -288,9 +291,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         onClose?(self)
     }
 
+    /// Undo and Redo change files. While the terminal has focus they get an empty stack, so ⌘Z
+    /// never undoes a file action by surprise.
     func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? {
-        AppServices.shared.undoManager
+        terminalHasFocus ? terminalUndoManager : AppServices.shared.undoManager
     }
+
+    var terminalHasFocus: Bool { window?.firstResponder is ShellTerminalView }
 
     func windowDidBecomeKey(_ notification: Notification) { updateToolbar() }
 
@@ -314,6 +321,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     @objc private func cutChanged() {
         let cut = FileActions.shared.pendingCut
         panes.forEach { $0.list.dimmedURLs = cut }
+        updateToolbar()   // Paste turns on after ⌘C or ⌘X
     }
 }
 

@@ -12,6 +12,7 @@ enum Formatters {
     static let bytes: ByteCountFormatter = {
         let f = ByteCountFormatter()
         f.countStyle = .file
+        f.allowsNonnumericFormatting = false   // "0 bytes", not "Zero KB"
         return f
     }()
 

@@ -83,9 +83,9 @@ extension BrowserWindowController: NSMenuItemValidation {
     // MARK: Validation
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
-        // While a text field edits (rename, path, search), file actions stay off so their keys
-        // (⌘⌫, ⌘A …) go to the text.
-        let editingText = window?.firstResponder is NSText
+        // While a text field edits (rename, path, search) or the terminal has focus, file actions
+        // stay off so their keys (⌘⌫, ⌘X, ⌘D …) go to the text or the shell.
+        let editingText = window?.firstResponder is NSText || terminalHasFocus
         let selection = activePane.list.selectedItems
         switch item.action {
         case #selector(goBack(_:)): return activePane.history.canGoBack
@@ -184,13 +184,15 @@ extension BrowserWindowController: NSToolbarDelegate {
             menu.addItem(NSMenuItem(title: "New Markdown File", action: #selector(newMarkdownFile(_:)), keyEquivalent: ""))
             item.menu = menu
             return item
-        case .cut: return button(id, "Cut", "scissors", #selector(cut(_:)), "Cut (⌘X)")
-        case .copy: return button(id, "Copy", "doc.on.doc", #selector(copy(_:)), "Copy (⌘C)")
-        case .paste: return button(id, "Paste", "doc.on.clipboard", #selector(paste(_:)), "Paste (⌘V)")
+        // In a narrow window Cut, Copy and Paste go into the » menu first (they have keys);
+        // the pane switch and Terminal stay.
+        case .cut: return button(id, "Cut", "scissors", #selector(cut(_:)), "Cut (⌘X)", priority: .low)
+        case .copy: return button(id, "Copy", "doc.on.doc", #selector(copy(_:)), "Copy (⌘C)", priority: .low)
+        case .paste: return button(id, "Paste", "doc.on.clipboard", #selector(paste(_:)), "Paste (⌘V)", priority: .low)
         case .rename: return button(id, "Rename", "pencil", #selector(renameSelection(_:)), "Rename (F2)")
         case .trash: return button(id, "Trash", "trash", #selector(moveToTrash(_:)), "Move to Trash (⌘⌫)")
         case .terminal:
-            let item = button(id, "Terminal", "apple.terminal", #selector(toggleTerminal(_:)), "Terminal (⌃`)")
+            let item = button(id, "Terminal", "apple.terminal", #selector(toggleTerminal(_:)), "Terminal (⌃`)", priority: .high)
             (item.view as? NSButton)?.setButtonType(.pushOnPushOff)
             return item
         case .terminalApp: return button(id, "Terminal app", "arrow.up.forward.app", #selector(openInTerminalApp(_:)), "Open this folder in your terminal app (⌥⌘T)")
@@ -205,6 +207,7 @@ extension BrowserWindowController: NSToolbarDelegate {
             let item = NSToolbarItem(itemIdentifier: id)
             item.view = seg
             item.label = "Panes"
+            item.visibilityPriority = .high
             toolbarButtons[id] = seg
             return item
         default:
@@ -212,7 +215,8 @@ extension BrowserWindowController: NSToolbarDelegate {
         }
     }
 
-    private func button(_ id: NSToolbarItem.Identifier, _ title: String, _ symbol: String, _ action: Selector, _ tip: String) -> NSToolbarItem {
+    private func button(_ id: NSToolbarItem.Identifier, _ title: String, _ symbol: String, _ action: Selector, _ tip: String,
+                        priority: NSToolbarItem.VisibilityPriority = .standard) -> NSToolbarItem {
         let b = NSButton(title: title, image: .symbol(symbol, title, size: 13), target: nil, action: action)
         b.imagePosition = .imageLeading
         b.bezelStyle = .toolbar
@@ -222,6 +226,7 @@ extension BrowserWindowController: NSToolbarDelegate {
         item.view = b
         item.label = title
         item.toolTip = tip
+        item.visibilityPriority = priority
         toolbarButtons[id] = b
         return item
     }

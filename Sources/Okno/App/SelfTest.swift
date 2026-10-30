@@ -254,6 +254,12 @@ enum SelfTest {
         check("Follow: opening a folder moves the shell", await waitFor(10) { same(t.currentFolder, inner) && t.isAtIdlePrompt })
         t.type(" builtin cd -- '\(folder.path)'\r")
         check("Follow: cd in the shell moves the pane", await waitFor(10) { same(w.activePane.folder, folder) })
+        t.focusTerminal()
+        await wait()
+        w.activePane.list.select([folder.appendingPathComponent("notes.md")], scroll: false)
+        let trash = NSMenuItem(title: "", action: #selector(BrowserWindowController.moveToTrash(_:)), keyEquivalent: "")
+        check("file actions are off while the terminal has focus", w.terminalHasFocus && !w.validateMenuItem(trash))
+        check("⌘Z in the terminal cannot undo a file action", w.window?.undoManager !== AppServices.shared.undoManager)
         await wait(1.5)
         if let window = w.window { DevHooks.grab(window, to: folder.deletingLastPathComponent().appendingPathComponent("terminal.png")) }
         w.toggleTerminal(nil)
@@ -296,6 +302,7 @@ enum SelfTest {
         await wait(1.5)
         guard let w = NSApp.windows.compactMap({ $0.windowController as? BrowserWindowController }).first else { return }
         let list = w.activePane.list
+        check("the file list has focus at launch", w.window?.firstResponder === list.tableView)
         let undo = AppServices.shared.undoManager
 
         w.newFolder(nil)

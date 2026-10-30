@@ -68,6 +68,20 @@ final class ListingTests: XCTestCase {
         XCTAssertEqual(names["data.weirdext"], "WEIRDEXT file")
     }
 
+    func testTypeNamesAreExplorerStyle() throws {
+        let box = CoreSandbox()
+        for n in ["notes.txt", "app.ts", "Report.PDF", ".gitignore", "Makefile", "page.rtf"] { box.file(n) }
+        let items = try DirectoryReader.read(box.root, includeHidden: true)
+        let names = Dictionary(uniqueKeysWithValues: items.map { ($0.name, FileTypes.displayName(for: $0)) })
+        XCTAssertEqual(names["notes.txt"], "Text document")
+        XCTAssertEqual(names["app.ts"], "TypeScript file")
+        XCTAssertEqual(names["Report.PDF"], "PDF document")
+        XCTAssertEqual(names[".gitignore"], "Git ignore file")
+        XCTAssertEqual(names["Makefile"], "Makefile")
+        let rtf = try XCTUnwrap(names["page.rtf"])
+        XCTAssertEqual(rtf.first.map(String.init), rtf.first.map { String($0).uppercased() }, "system names start with a capital")
+    }
+
     func testFilterMatchesEveryWordAnyCase() throws {
         let box = CoreSandbox()
         for n in ["Report final.pdf", "report draft.pdf", "Café Zażółć.txt"] { box.file(n) }

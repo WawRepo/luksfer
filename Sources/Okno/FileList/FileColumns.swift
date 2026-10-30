@@ -18,10 +18,10 @@ enum FileColumn: String, CaseIterable {
 
     var defaultWidth: CGFloat {
         switch self {
-        case .name: return 340
-        case .modified, .created: return 150
-        case .type: return 150
-        case .size: return 80
+        case .name: return 300
+        case .modified, .created: return 130
+        case .type: return 130
+        case .size: return 70
         case .fileExtension: return 70
         }
     }
@@ -60,6 +60,7 @@ final class NameCellView: NSTableCellView {
         label.translatesAutoresizingMaskIntoConstraints = false
         label.lineBreakMode = .byTruncatingMiddle
         label.cell?.isScrollable = false
+        label.allowsExpansionToolTips = true
         cloud.translatesAutoresizingMaskIntoConstraints = false
         cloud.image = .symbol("icloud", "Only in the cloud", size: 11)
         cloud.contentTintColor = .secondaryLabelColor
@@ -94,6 +95,7 @@ final class TextCellView: NSTableCellView {
         super.init(frame: .zero)
         label.translatesAutoresizingMaskIntoConstraints = false
         label.lineBreakMode = .byTruncatingTail
+        label.allowsExpansionToolTips = true
         label.alignment = alignment
         label.textColor = .secondaryLabelColor
         addSubview(label)

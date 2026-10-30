@@ -7,6 +7,8 @@ protocol FileListDelegate: AnyObject {
     func fileList(_ list: FileListViewController, open items: [FileItem])
     func fileList(_ list: FileListViewController, handle key: ListKey) -> Bool
     func fileListSelectionDidChange(_ list: FileListViewController)
+    /// The shown items changed (loaded, filtered or reloaded).
+    func fileListItemsDidChange(_ list: FileListViewController)
     func fileListSortDidChange(_ list: FileListViewController)
     func fileList(_ list: FileListViewController, menuFor items: [FileItem]) -> NSMenu?
     func fileList(_ list: FileListViewController, rename item: FileItem, to name: String)
@@ -51,7 +53,7 @@ final class FileListViewController: NSViewController {
         tableView.allowsColumnReordering = true
         tableView.allowsColumnResizing = true
         tableView.allowsTypeSelect = true
-        tableView.columnAutoresizingStyle = .noColumnAutoresizing
+        tableView.columnAutoresizingStyle = .noColumnAutoresizing   // fitNameColumn() sizes Name
         tableView.rowHeight = 22
         tableView.intercellSpacing = NSSize(width: 6, height: 0)
         tableView.gridStyleMask = []
@@ -70,6 +72,9 @@ final class FileListViewController: NSViewController {
         scrollView.documentView = tableView
         NotificationCenter.default.addObserver(self, selector: #selector(columnsChanged), name: NSTableView.columnDidResizeNotification, object: tableView)
         NotificationCenter.default.addObserver(self, selector: #selector(columnsChanged), name: NSTableView.columnDidMoveNotification, object: tableView)
+        // The clip view also narrows when a scroll bar appears, without a new layout pass.
+        scrollView.contentView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(clipViewResized), name: NSView.frameDidChangeNotification, object: scrollView.contentView)
     }
 
     // MARK: Columns
@@ -94,7 +99,27 @@ final class FileListViewController: NSViewController {
         updateSortIndicator()
     }
 
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        fitNameColumn()
+    }
+
+    /// Name takes the width the other columns leave (at least its minimum), so Type and Size stay
+    /// in view in a narrow pane. Runs when the pane changes size or another column changes.
+    private func fitNameColumn() {
+        guard let name = tableView.tableColumn(withIdentifier: FileColumn.name.identifier) else { return }
+        // The table's own column edges include its spacing and insets.
+        let right = tableView.tableColumns.indices.filter { !tableView.tableColumns[$0].isHidden }
+            .map { tableView.rect(ofColumn: $0).maxX }.max() ?? 0
+        let width = max(name.minWidth, floor(name.width - (right - scrollView.contentView.bounds.width)))
+        if abs(name.width - width) > 0.5 { name.width = width }
+    }
+
+    @objc private func clipViewResized(_ note: Notification) { fitNameColumn() }
+
     @objc private func columnsChanged(_ note: Notification) {
+        // A user resizing Name keeps that width until the pane changes size.
+        if (note.userInfo?["NSTableColumn"] as? NSTableColumn)?.identifier != FileColumn.name.identifier { fitNameColumn() }
         let states = tableView.tableColumns.map { ColumnState(id: $0.identifier.rawValue, width: Double($0.width), hidden: $0.isHidden) }
         AppServices.shared.update { $0.columns = states }
     }
@@ -158,6 +183,7 @@ final class FileListViewController: NSViewController {
     }
 
     private func applyItems(keepSelection: Bool) {
+        defer { delegate?.fileListItemsDidChange(self) }
         guard renaming == nil else { return }
         let selected = keepSelection ? selectedURLs : []
         items = FileSorter.sort(ListFilter.filter(allItems, query: filterQuery), by: sortOrder)
@@ -281,7 +307,7 @@ extension FileListViewController: NSTableViewDataSource, NSTableViewDelegate {
         case .modified: cell.label.stringValue = Formatters.date.string(from: item.modified)
         case .created: cell.label.stringValue = Formatters.date.string(from: item.created)
         case .type: cell.label.stringValue = FileTypes.displayName(for: item)
-        case .size: cell.label.stringValue = item.isFolder ? "" : Formatters.size(item.size)
+        case .size: cell.label.stringValue = item.isFolder || item.isPackage ? "" : Formatters.size(item.size)
         case .fileExtension: cell.label.stringValue = item.fileExtension
         case .name: break
         }

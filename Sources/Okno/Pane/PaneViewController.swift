@@ -138,7 +138,7 @@ final class PaneViewController: NSViewController {
             row.trailingAnchor.constraint(equalTo: header.trailingAnchor),
             row.centerYAnchor.constraint(equalTo: header.centerYAnchor, constant: 1),
             pathBar.heightAnchor.constraint(equalToConstant: 28),
-            searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 110),
+            searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
             searchField.widthAnchor.constraint(lessThanOrEqualToConstant: 200),
             separator.topAnchor.constraint(equalTo: header.bottomAnchor),
             separator.leadingAnchor.constraint(equalTo: root.leadingAnchor),
@@ -154,6 +154,11 @@ final class PaneViewController: NSViewController {
         let searchWidth = searchField.widthAnchor.constraint(equalToConstant: 170)
         searchWidth.priority = .defaultLow
         searchWidth.isActive = true
+        // In a narrow pane the search box shrinks first; the path bar keeps room for a few crumbs.
+        let pathWidth = pathBar.widthAnchor.constraint(greaterThanOrEqualToConstant: 160)
+        pathWidth.priority = .defaultHigh
+        pathWidth.isActive = true
+        searchField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         show(folder, select: nil)
     }
@@ -222,6 +227,7 @@ final class PaneViewController: NSViewController {
             self.spinnerWork?.cancel()
             self.spinner.stopAnimation(nil)
             self.showError(error)
+            self.updateMessage()
         }
         watcher = FolderWatcher(folder: url, onChange: { [weak self] in self?.list.reload() },
                                 onGone: { [weak self] in self?.folderWentAway() })
@@ -240,13 +246,30 @@ final class PaneViewController: NSViewController {
         upButton.isEnabled = !folder.isRootFolder
     }
 
+    /// The empty-folder and no-match messages; errors win.
+    private func updateMessage() {
+        guard isViewLoaded, list.loadError == nil else { return }
+        guard list.items.isEmpty else { messageBox.isHidden = true; return }
+        let query = searchField.stringValue
+        messageLabel.stringValue = query.isEmpty
+            ? "This folder is empty.\nRight-click to add a folder or a file."
+            : "Nothing here matches “\(query)”."
+        messageButton.isHidden = true
+        messageBox.isHidden = false
+    }
+
     private func showError(_ error: Error?) {
         guard let error else { messageBox.isHidden = true; return }
         let code = (error as? POSIXError)?.code
-        if code == .EPERM || code == .EACCES {
+        if code == .EPERM {
             messageLabel.stringValue = "macOS blocked Okno from reading this folder.\nAllow it in System Settings › Privacy & Security › Files and Folders, or give Okno Full Disk Access."
             messageButton.isHidden = false
+        } else if code == .EACCES {
+            messageLabel.stringValue = "You don't have permission to see what is in this folder."
+            messageButton.isHidden = true
         } else if code == .ENOENT {
+            // The folder went away while we came here: go to the nearest folder that exists.
+            if !FileManager.default.fileExists(atPath: folder.path) { folderWentAway(); return }
             messageLabel.stringValue = "This folder does not exist any more."
             messageButton.isHidden = true
         } else {
@@ -312,6 +335,7 @@ extension PaneViewController: FileListDelegate {
     }
 
     func fileListSelectionDidChange(_ list: FileListViewController) { delegate?.paneSelectionDidChange(self) }
+    func fileListItemsDidChange(_ list: FileListViewController) { updateMessage() }
     func fileListSortDidChange(_ list: FileListViewController) { delegate?.paneSortDidChange(self) }
 
     func fileList(_ list: FileListViewController, menuFor items: [FileItem]) -> NSMenu? {
