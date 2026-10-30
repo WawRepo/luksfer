@@ -137,6 +137,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if on { panesSplit.setPosition(panesSplit.bounds.width / 2, ofDividerAt: 0) }
         if !on && activeIndex == 1 { setActive(0) }
         for pane in panes { pane.showsActiveMark = on }
+        panes[0].side = on ? "Left" : nil
+        panes[1].side = on ? "Right" : nil
         (toolbarButtons[.panes] as? NSSegmentedControl)?.selectedSegment = on ? 1 : 0
         if focus { activePane.list.focus() }
     }

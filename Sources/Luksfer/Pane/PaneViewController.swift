@@ -47,6 +47,10 @@ final class PaneViewController: NSViewController {
     /// The pane shows the active marks (the self-test reads it).
     var showsAsActive: Bool { !activeMark.isHidden }
 
+    /// "Left" or "Right" in two panes, nil with one. VoiceOver reads it in the names of the pane
+    /// and its file list, so the two lists are not both just "Files".
+    var side: String? { didSet { updateAccessibility() } }
+
     init(folder: URL, sort: FileSortOrder) {
         history = NavigationHistory(start: folder)
         pathBar = PathBarView(folder: folder)
@@ -160,7 +164,16 @@ final class PaneViewController: NSViewController {
         searchField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         updateActiveLook()
+        updateAccessibility()
         show(folder, select: nil)
+    }
+
+    private func updateAccessibility() {
+        guard isViewLoaded else { return }
+        view.setAccessibilityElement(side != nil)
+        view.setAccessibilityRole(.group)
+        view.setAccessibilityLabel(side.map { "\($0) pane" })
+        list.tableView.setAccessibilityLabel(side.map { "Files, \($0.lowercased()) pane" } ?? "Files")
     }
 
     /// In two panes the active pane has an accent line on top, a lightly tinted header and an
