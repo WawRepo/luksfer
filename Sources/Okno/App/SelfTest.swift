@@ -36,6 +36,48 @@ enum SelfTest {
         view.keyDown(with: event)
     }
 
+    /// Finds a button by title in a view tree.
+    private static func button(_ title: String, in view: NSView?) -> NSButton? {
+        guard let view else { return nil }
+        if let b = view as? NSButton, b.title == title { return b }
+        for sub in view.subviews { if let b = button(title, in: sub) { return b } }
+        return nil
+    }
+
+    /// Waits for a sheet on the window and clicks its button. False when no sheet came.
+    private static func answer(_ title: String, on window: NSWindow?) async -> Bool {
+        for _ in 0..<30 {
+            if let sheet = window?.attachedSheet, let b = button(title, in: sheet.contentView) {
+                b.performClick(nil)
+                return true
+            }
+            await wait(0.1)
+        }
+        return false
+    }
+
+    /// The name-clash question and the "delete for good" question (milestone 3).
+    private static func questions(in folder: URL, window w: BrowserWindowController) async {
+        let inner = folder.appendingPathComponent("New folder")
+        let trash = URL(fileURLWithPath: ProcessInfo.processInfo.environment["OKNO_TRASH_DIR"]!)
+        let trashed = names(trash).count
+        FileActions.shared.transfer([folder.appendingPathComponent("notes.md")], into: inner, operation: .copy, in: w)
+        check("a name clash asks first", await answer("Replace", on: w.window))
+        await wait(1.2)
+        check("Replace puts the old file in the Trash", names(trash).count == trashed + 1 && names(inner).contains("notes.md"))
+
+        FileActions.shared.transfer([folder.appendingPathComponent("notes.md")], into: inner, operation: .copy, in: w)
+        check("the clash question comes again", await answer("Keep Both", on: w.window))
+        await wait(1.2)
+        check("Keep Both keeps both", names(inner).count == 2)
+
+        let file = folder.appendingPathComponent("New text file.txt")
+        FileActions.shared.deletePermanently([file], in: w)
+        check("Delete Immediately asks first", await answer("Cancel", on: w.window))
+        await wait()
+        check("Cancel keeps the file", names(folder).contains("New text file.txt"))
+    }
+
     /// Milestone 2 and 4: keys, Quick Look, search, sort, hidden files, Favorites, pane switching.
     private static func navigation(in folder: URL, window w: BrowserWindowController) async {
         let inner = folder.appendingPathComponent("New folder")
@@ -177,6 +219,7 @@ enum SelfTest {
         check("copy to the other pane's folder", names(folder.appendingPathComponent("New folder")).contains("notes.md") && names(folder).contains("notes.md"))
         check("other pane shows the copy", w.otherPane.list.items.contains { $0.name == "notes.md" })
 
+        await questions(in: folder, window: w)
         await navigation(in: folder, window: w)
 
         DevHooks.snapshot(to: folder.deletingLastPathComponent().appendingPathComponent("selftest.png"))
