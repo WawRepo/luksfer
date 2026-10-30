@@ -149,7 +149,13 @@ enum SelfTest {
         check("Space opens Quick Look", QLPreviewPanel.sharedPreviewPanelExists() && QLPreviewPanel.shared().isVisible)
         pane.list.toggleQuickLook()
         await wait()
-        check("Quick Look closes", !QLPreviewPanel.shared().isVisible)
+        // Without a key window (another app is in front) the panel has no controller and does not
+        // close. The test must not take focus from the user, so it skips this check then.
+        if NSApp.keyWindow == nil {
+            FileHandle.standardError.write(Data("selftest: SKIP Quick Look closes (Luksfer is not the active app)\n".utf8))
+        } else {
+            check("Quick Look closes", !QLPreviewPanel.shared().isVisible)
+        }
         pane.list.focus()
 
         pane.list.select([folder.appendingPathComponent("notes.md")], scroll: false)
