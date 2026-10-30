@@ -1,10 +1,12 @@
-# Luksfer — PRD v0.1
+# Luksfer — Product requirements
 
-Oct 30, 2026 · Waw · Status: draft
+Version 0.2 · October 2026 · Status: milestones 1–5 are built; milestone 6 (daily use) is next.
 
-*Name: Luksfer (Polish for a glass block; the working name was Okno, Polish for "window").*
+Luksfer is a native macOS file explorer that works like Windows Explorer. "Luksfer" is Polish for a
+glass block, the brick that lets light through a wall. The working name was Okno (Polish for
+"window"), so older commits use that name.
 
-Mockup (clickable): source in `docs/mockup/`.
+Items marked *(planned)* are not built yet. Everything else is in the app today.
 
 ## 1. Problem
 
@@ -12,14 +14,13 @@ Finder does not work the way a long-time Windows user works, and it cannot be se
 
 - The context menu has no "New file", only "New Folder".
 - Enter renames a file instead of opening it.
-- There is no cut and paste for files. You copy, then use ⌥⌘V to move.
-- The path bar is read-only. Typing a path needs a separate dialog (⇧⌘G).
-- There is one pane per window and no terminal inside the window.
+- There is no cut and paste for files. You copy, then press ⌥⌘V to move.
+- The path bar is read-only. To type a path you open a separate dialog (⇧⌘G).
+- There is one pane per window, and no terminal inside the window.
 - The details (list) view is not the default for every folder.
 
 Other file managers exist (ForkLift, Path Finder, Commander One, QSpace Pro). Most follow Finder or
-Total Commander habits. We have not found one built around Windows Explorer habits. The spike
-checks this again before we build much.
+Total Commander habits. None is built around Windows Explorer habits.
 
 ## 2. Vision
 
@@ -28,196 +29,208 @@ click or type, Favorites in the sidebar that are easy to change, and New file / 
 right-click. On top of that: two panes side by side, drag and drop between them, and a terminal
 inside the window. It is the app you open for everyday file work instead of Finder.
 
-## 3. Target user
+## 3. Who it is for
 
-- **v1:** Waw. A developer with many years of Windows habits. Works in a Google Drive folder with
-  many repos, and uses the terminal all day.
-- **Later:** people who move from Windows to a Mac, and developers. Decide after the dogfood
-  milestone.
+- **Version 1:** the author, a developer with many years of Windows habits who works in a
+  cloud-synced folder full of repos and uses the terminal all day.
+- **Later:** people who move from Windows to a Mac, and developers in general. This is decided after
+  milestone 6.
 
-## 4. Core features (v1)
+## 4. Principles
 
-1. Details view by default, in every folder.
-2. One or two panes, switched with one click.
-3. Path bar: click a part to jump, or type a path.
-4. Favorites at the top of the sidebar: pin, reorder and unpin in one step.
-5. Context menu with New folder and New text file on files, folders and empty space.
-6. Drag and drop between the panes, onto folders, onto Favorites, and to and from other apps.
-7. Terminal inside the app (a panel at the bottom) and outside (open a terminal app here).
-
-## 5. Key decisions (v1)
-
-- **Native macOS app in Swift.** The file list uses AppKit (`NSOutlineView` / `NSTableView`): it is
-  fast with 10,000+ rows and has column resize, drag and drop and type-to-select built in. SwiftUI
-  only where it is simpler (settings). The spike confirms this.
-- **Outside the Mac App Store.** The App Store sandbox blocks a general file manager. When the app
-  is shared: Developer ID signing and notarization. For v1 a local build is enough.
+- **Native macOS app in Swift.** The file list is an AppKit `NSTableView`: it is fast with 10,000+
+  rows and has column resize, drag and drop and type-to-select built in. SwiftUI only where it is
+  simpler (Settings). The spike chose this stack (`docs/spike-report.md`).
 - **Windows keys by default:** Enter opens, F2 renames, ⌘X / ⌘C / ⌘V cut, copy and paste files,
   ⌘⌫ moves to the Trash, ⌘↑ goes up, ⌘L edits the path. A setting switches to Finder keys.
-- **Delete means Trash.** A permanent delete needs ⇧ and a confirm. Every file action can be undone
-  or asks first.
+- **Never lose a file.** Delete moves to the Trash. A permanent delete asks first. Every file action
+  can be undone, or asks first.
 - **Finder stays.** macOS keeps Finder for the desktop and the Dock. Luksfer does not replace them.
 - **Standard files on the clipboard and in drag and drop**, so Finder, Mail and VS Code see normal
   files.
-- **Own settings only.** Favorites, columns and panes live in Luksfer's settings. Luksfer never changes
-  Finder's settings or Finder's sidebar.
-- **No network, no telemetry, no account.**
-- **Open source later.** The repo becomes public after v1 works; no date yet. Until then it is
-  private, but every commit is written as if it were public (no private data in the history).
+- **Own settings only.** Favorites, columns and panes live in Luksfer's settings
+  (`~/Library/Application Support/Luksfer/`). Luksfer never changes Finder's settings or Finder's
+  sidebar.
+- **No network, no telemetry, no account.** The one exception is a network drive that the user sets
+  up; macOS makes that connection.
+- **Open source** under the MIT license. Distributed outside the Mac App Store, because the App Store
+  sandbox blocks a general file manager.
 
-## 6. Functional requirements
+## 5. Features
 
-### 6.1 Window and panes
+### 5.1 Window and panes
 
-- One or two panes. A toolbar button and a shortcut switch between them.
+- One or two panes. A toolbar button, ⌥⌘1 and ⌥⌘2 switch between them.
 - Each pane has its own folder, back and forward history, selection, sort and search.
 - Tab moves to the other pane. The active pane has a clear mark.
-- "Open in other pane", "Swap panes", and "Same folder in both".
-- More windows with ⌘N. Luksfer remembers the panes and their folders between launches.
+- Open in Other Pane, Swap Panes (⌥⌘U) and Same Folder in Both (⌥⌘=).
+- Back and forward: the toolbar buttons, ⌘[ and ⌘], Backspace, and the back and forward buttons of a
+  mouse. The mouse buttons work on the pane under the pointer, like Explorer.
+- More windows with ⌘N. Luksfer remembers its windows, panes and folders between launches.
 
-### 6.2 Details view (default)
+### 5.2 Details view
 
-- Columns: Name, Date modified, Type, Size. Optional: Date created, Extension. Columns can be
-  resized, moved and hidden. Click a column header to sort. Like Explorer, folders come first in
-  an ascending sort and last in a descending one.
-- Details is the default for every folder. A pane can switch to Icons (with thumbnails).
-- File extensions always show. Hidden files show with ⇧⌘. (the Finder key).
-- Folder size stays empty, like Windows. "Calculate size" is on the context menu (later).
+- Columns: Name, Date modified, Type and Size. Date created and Extension can be turned on. Columns
+  can be resized, moved and hidden.
+- Click a column header to sort. Like Explorer, folders come first in an ascending sort and last in
+  a descending one.
+- Details is the default for every folder. *(planned)* A pane can switch to Icons, with thumbnails.
+- File extensions always show. Hidden files are off by default; ⇧⌘. (the Finder key) shows them, and
+  Luksfer remembers the choice.
+- A folder's size stays empty, like Explorer. *(planned)* "Calculate size" on the context menu.
 - Select with click, ⇧-click, ⌘-click and a drag rectangle. Type the first letters to jump to a file.
 - Space opens Quick Look (the macOS preview).
 
-### 6.3 Path bar
+### 5.3 Path bar and search
 
-- Breadcrumbs: click a part to jump there. Click › after a part to list its subfolders and jump.
+- Breadcrumbs: click a part to jump there. Click › after a part to list its subfolders.
 - Click the empty end of the bar, or press ⌘L: the bar becomes a text field with the whole path
   selected.
-- It takes `~`, `/Users/...`, paths pasted from a terminal (with quotes or `\ ` escapes), relative
+- It takes `~`, absolute paths, paths pasted from a terminal (with quotes or `\ ` escapes), relative
   paths, and file paths (the folder opens and the file is selected).
 - Folders autocomplete. Tab completes, Enter goes, Esc cancels. A wrong path shows a clear message.
 - Type `term`, `terminal` or `cmd` to open the terminal in this folder (the Windows `cmd` habit).
-- A Copy path button, and ⌥⌘C.
-- A search box per pane filters the current folder as you type. Enter searches subfolders too
-  (Spotlight or our own walk; the spike decides).
+- Copy Path: a button, ⌥⌘C, and the context menu.
+- A search box per pane (⌘F) filters the current folder as you type. *(planned)* Enter also searches
+  subfolders.
 
-### 6.4 Sidebar
+### 5.4 Sidebar
 
-- **Favorites** at the top. Pin a folder: drag it onto Favorites, or "Pin to Favorites" on its
-  context menu. Reorder by drag. Unpin from the context menu or in Edit mode (↑ ↓ ✕ buttons).
-  Rename the label; the path stays.
-- **This Mac:** Home, Desktop, Documents, Downloads, Pictures, Google Drive.
-- **Locations:** Macintosh HD, Applications, external drives (with Eject), the Trash.
-- **Network:** saved network drives (SMB), then network volumes mounted some other way. The + on
-  the section, or ⌘K, adds a drive, like Explorer's "Map network drive": address
-  (`smb://server/share` or `\\server\share`), name, user (empty for a guest) and password. Click a
-  drive to connect; it opens in the active pane. A connected drive shows Disconnect (the Eject
-  button). Context menu: Connect or Open, Disconnect, Edit, Remove.
-- The password goes to the macOS Keychain only, never into the settings file. Luksfer never shows a
-  saved password again; Edit can only replace it. Without a saved password, Connect asks for it.
+- **Favorites** at the top. Pin a folder: drag it onto Favorites, or use "Pin to Favorites". Drag to
+  reorder. Unpin from the context menu or in Edit mode (↑ ↓ ✕ buttons). Rename a label; the path
+  stays.
+- **This Mac:** Home, Desktop, Documents, Downloads, Pictures, and cloud folders such as Google
+  Drive.
+- **Locations:** the start disk, Applications, external drives (with Eject), the Trash.
+- **Network:** saved network drives (5.8), then network volumes that were mounted some other way.
 - Sections fold open and closed.
 
-### 6.5 Context menu
+### 5.5 Context menus
 
-- **On a file:** Open, Open with ▸, Quick Look, Cut, Copy, Copy path, Rename, Duplicate, Compress,
-  Move to Trash; New folder and New text file *next to this file*; Open in Terminal (inside),
-  Open in Terminal app; Get Info.
-- **On a folder:** Open, Open in other pane, Pin or Unpin from Favorites, Cut, Copy, Paste into,
-  Copy path, Rename, Move to Trash; New folder and New text file *inside it* and *next to it*
-  (in a New ▸ submenu, like Explorer); Open in Terminal (inside), Open in Terminal app.
-- **On empty space:** New folder, New text file, New Markdown file, Paste, Copy path, Pin this
-  folder, Open in Terminal, Open in Terminal app, Sort by, View.
-- Menu items show their key shortcut.
-- A new item appears with its name selected for typing, like Windows. Esc keeps the default name.
+- **On a file:** Open, Open With ▸, Quick Look, Cut, Copy, Copy Path, Rename, Duplicate, Compress,
+  Move to Trash; New folder and New text file *next to this file*; Open in Terminal (inside), Open in
+  Terminal App; Get Info.
+- **On a folder:** Open, Open in Other Pane, Pin to or Unpin from Favorites, Cut, Copy, Paste Into Folder,
+  Copy Path, Rename, Move to Trash; a New ▸ submenu with a folder or text file *inside it* or *next to
+  it*; Open in Terminal (inside), Open in Terminal App.
+- **On empty space:** New Folder, New Text File, New Markdown File, Paste, Copy Path, Pin This Folder,
+  Open in Terminal, Open in Terminal App, Sort By, View.
+- Menu items show their key shortcuts.
+- A new item appears with its name selected for typing, like Explorer. Esc keeps the default name.
   When it is made inside a folder that no pane shows, the pane opens that folder first.
 
-### 6.6 File actions
+### 5.6 File actions
 
-- Cut, copy and paste files with ⌘X, ⌘C, ⌘V. Copy and paste work both ways with Finder. A cut in
+- Cut, copy and paste files with ⌘X, ⌘C and ⌘V. Copy and paste work both ways with Finder. A cut in
   Luksfer that is pasted in Finder becomes a copy (Finder has no cut).
-- Drag and drop: between panes, onto a folder row, onto Favorites (pins it), and to and from other
-  apps. Same disk: move. Other disk: copy. ⌥ forces copy, ⌘ forces move. A badge says what will
-  happen.
-- Name clash: Replace, Skip or Keep both, with "Do this for all" when more items follow, or Stop
+- Drag and drop: between panes, onto a folder row, onto Favorites (this pins the folder), and to and
+  from other apps. Same disk: move. Other disk: copy. ⌥ forces a copy, ⌘ forces a move. A badge
+  shows what will happen.
+- Name clash: Replace, Skip or Keep Both, with "Do this for all" when more items follow, or Stop
   (Esc). The question shows the size and date of both items.
-- After an action the status bar says what it did, with Undo where it can be undone.
+- After an action, the status bar says what it did, with Undo where it can be undone.
 - Long copies show progress in the status bar, can be stopped, and never block the window.
-- Undo (⌘Z) for rename, move, copy, new item and Trash.
-- Rename in place with F2.
+- Undo (⌘Z) for rename, move, copy, new item and Trash. One Undo undoes one action.
+- Rename in place with F2 (or Enter with Finder keys).
 
-### 6.7 Terminal
+### 5.7 Terminal
 
 - **Inside:** a panel at the bottom of the window, like VS Code. It runs the user's login shell
   (zsh) in the folder of the active pane. ⌃` opens and closes it.
-- **Follow** (on by default): `cd` in the terminal moves the active pane, and opening a folder sends
-  `cd` to the terminal, but only while the shell waits at its prompt.
-- **Outside:** "Open in Terminal app" opens Terminal, iTerm2, Ghostty or Warp in that folder. A
+- **Follow** (on by default): `cd` in the terminal moves the active pane, and opening a folder moves
+  the shell, but only while the shell waits at its prompt.
+- **Outside:** Open in Terminal App (⌥⌘T) opens Terminal, iTerm2, Ghostty or Warp in that folder. A
   setting picks the app.
-- The `term` word in the path bar (6.3).
+- The `term` word in the path bar (5.3).
 
-### 6.8 Default file viewer
+### 5.8 Network drives
 
-- An option to make Luksfer answer "Show in Finder" and "Reveal in Finder" from other apps, where
-  macOS allows it. ForkLift and Path Finder offer this; the spike checks how and on which macOS.
+- Add a drive like Explorer's "Map network drive": the + on the Network section, or ⌘K. The dialog
+  asks for the address (`smb://server/share` or `\\server\share`), a name, the user name (empty for a
+  guest) and the password.
+- Click a drive to connect. It opens in the active pane. A connected drive shows Disconnect (the
+  Eject button). The context menu has Connect or Open, Open in Other Pane, Disconnect, Edit and
+  Remove from Sidebar.
+- The password goes to the macOS Keychain only, never into the settings file. Luksfer never shows a
+  saved password again; Edit can only replace it. Without a saved password, Connect asks for it.
+- macOS makes the connection (NetFS). It runs in the background and the Stop button ends it.
+- Only SMB for now.
 
-### 6.9 Cloud and network folders
+### 5.9 Cloud folders and slow volumes
 
-- Google Drive folders (the macOS File Provider) list without downloading file contents. A column
-  or icon shows "only in the cloud" or "on this Mac". Listing, icons and thumbnails never start a
-  big download.
-- Slow folders (cloud, network) load in the background. The window never freezes; the pane shows
-  that it is loading.
+- Cloud folders (Google Drive and other macOS File Provider folders) list without downloading file
+  contents. An icon shows "only in the cloud". Listing, sizes and icons never start a download.
+- Slow folders (cloud, network) load in the background. The window never freezes; the pane shows that
+  it is loading, and the old rows go away so nothing acts on the old folder.
 - A network server that goes away never freezes the sidebar: Luksfer reads the mount table without
-  waiting for a server. Connecting runs in the background and can be stopped.
+  waiting for a server.
 
-## 7. Non-functional requirements
+### 5.10 Settings
+
+- Keys: Windows (Enter opens, F2 renames) or Finder (Enter renames, ⌘↓ opens).
+- Show hidden files.
+- The terminal app for Open in Terminal App, and Follow on or off.
+
+### 5.11 Default file viewer *(planned)*
+
+- An opt-in switch that makes Luksfer answer "Show in Finder" and "Reveal in Finder" from other apps,
+  where macOS allows it. The spike found that this reaches Luksfer only from apps that ask macOS for
+  the file viewer (`NSFileViewer`), the same limit that ForkLift and Path Finder have.
+
+## 6. Quality requirements
 
 - **Speed:** a local folder with 10,000 items opens in under 300 ms and scrolls without dropped
   frames on Apple Silicon. The app starts in under 1 s.
 - **Never block the window** on disk, network or cloud work.
 - **Memory:** under 200 MB with two panes and the terminal open.
 - **Safety:** delete goes to the Trash; every destructive action can be undone or asks first.
-- **Privacy:** no network requests and no telemetry. The only network use is a network drive the
-  user set up; macOS makes that connection.
+- **Privacy:** no network requests and no telemetry, except a network drive that the user set up.
 - **Native:** dark mode, the system accent color, VoiceOver labels, and every action by keyboard.
+- **Permissions:** when macOS blocks a folder (Desktop, Documents, Downloads, external drives),
+  Luksfer says why and how to allow it (Files and Folders, or Full Disk Access).
 - **Platform:** Apple Silicon, macOS 15 or newer.
-- **Permissions:** when macOS blocks a folder (Desktop, Documents, Downloads, external drives), Luksfer
-  says why and how to allow it (Files and Folders, or Full Disk Access).
 
-## 8. Out of scope (v1)
+## 7. Distribution
+
+- Each version is a GitHub Release with a disk image (`Luksfer-<version>.dmg`) and its SHA-256
+  checksum. A GitHub Actions workflow builds it when a version tag (`v0.1.0`) is pushed.
+- Install: open the disk image and drag Luksfer to Applications.
+- The app is not notarized yet, so macOS blocks the first open. The user allows it once in System
+  Settings > Privacy & Security > Open Anyway. Developer ID signing and notarization remove this
+  step; they need a paid Apple Developer account (open question, 9).
+
+## 8. Out of scope for version 1
 
 - Replacing the desktop or the Dock.
-- Tabs inside a pane (planned right after v1).
-- FTP, SFTP and cloud-storage connections; archives opened as folders; batch rename; folder compare
-  and sync; a git status column; tags; a Spotlight-wide search screen.
+- Tabs inside a pane (planned right after version 1).
+- FTP, SFTP, AFP, NFS and cloud-storage connections; archives opened as folders; batch rename;
+  folder compare and sync; a git status column; tags; a Spotlight-wide search screen.
 - Windows and Linux versions; the Mac App Store.
 
 ## 9. Risks and open questions
 
-- **macOS limits.** Finder always runs. "Show in Finder" may come to Luksfer only from apps that ask
-  macOS for the file viewer. Spike.
-- **The list view.** SwiftUI `Table` may be too slow or too limited for 10,000 rows and drag and
-  drop; AppKit is the safer start. Spike.
-- **Embedded terminal.** SwiftTerm (an AppKit terminal view that can run a local shell) is the first
-  choice; check its license (MIT expected) and how it handles zsh, colors and resize. Spike.
-- **Google Drive.** Reading names, sizes and icons of "online only" files must not download them.
-  Test on a real Google Drive folder, read only. Spike.
-- **Function keys.** F2 needs the Fn key on most Mac keyboards. Offer Enter-to-rename as a setting,
-  or another rename key.
-- **Name.** Trademark and domain check before any public use.
-- **License** for the public repo: not chosen yet. Decide before the repo goes public.
-- **Competition.** ForkLift, Path Finder, Commander One and QSpace Pro are mature. Our edge is Windows
-  habits, the built-in terminal and a developer focus. It is a personal tool first.
+- **"Show in Finder".** Finder always runs, and other apps reach Luksfer only when they ask macOS for
+  the file viewer (5.11).
+- **Function keys.** F2 needs the Fn key on most Mac keyboards. The Finder keys setting makes Enter
+  rename instead.
+- **Notarization.** A paid Apple Developer account removes the first-open step (7). Decide before
+  the first public release.
+- **Competition.** ForkLift, Path Finder, Commander One and QSpace Pro are mature. Luksfer's edge is
+  Windows habits, the built-in terminal and a developer focus.
 
 ## 10. Milestones
 
-1. **Spike:** an AppKit details list with 10,000 rows (speed), a Google Drive folder listed without
-   downloads, a SwiftTerm panel in a window, the "default file viewer" check, and drag and drop
-   with Finder. A short report and the stack choice.
-2. **Browser:** one pane, details view, path bar (breadcrumbs, typing, autocomplete), sidebar with
-   editable Favorites, back, forward and up, Quick Look, Windows keys.
-3. **File actions:** context menus with New file and New folder, rename in place, cut, copy and
-   paste, Trash and Undo, the name-clash dialog, progress.
-4. **Two panes and drag and drop:** between panes, onto folder rows, onto Favorites, and with other
-   apps.
-5. **Terminal:** the built-in panel with Follow, "Open in Terminal app", and `term` in the path bar.
-6. **Dogfood:** use Luksfer as the daily file manager; set it as the default file viewer; fix what
-   hurts. Then decide on tabs, the icons view, the license, and when the repo goes public.
+1. **Spike** — done. An AppKit details list with 10,000 rows, a Google Drive folder listed without
+   downloads, a SwiftTerm panel, the "default file viewer" check, and drag and drop with Finder.
+   Results: `docs/spike-report.md`.
+2. **Browser** — done. One pane, details view, path bar (breadcrumbs, typing, autocomplete), sidebar
+   with editable Favorites, back, forward and up, Quick Look, Windows keys.
+3. **File actions** — done. Context menus with New file and New folder, rename in place, cut, copy
+   and paste, Trash and Undo, the name-clash dialog, progress.
+4. **Two panes and drag and drop** — done. Between panes, onto folder rows, onto Favorites, and with
+   other apps.
+5. **Terminal** — done. The built-in panel with Follow, Open in Terminal App, and `term` in the path
+   bar. Network drives were added after this milestone.
+6. **Daily use** — next. Use Luksfer as the everyday file manager, fix what hurts, add the default
+   file viewer switch. Then decide on tabs and the Icons view.
+7. **First public release** — a notarized (or clearly documented) disk image on GitHub Releases.
