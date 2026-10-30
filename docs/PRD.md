@@ -114,11 +114,13 @@ inside the window. It is the app you open for everyday file work instead of Find
   Move to Trash; New folder and New text file *next to this file*; Open in Terminal (inside),
   Open in Terminal app; Get Info.
 - **On a folder:** Open, Open in other pane, Pin or Unpin from Favorites, Cut, Copy, Paste into,
-  Copy path, Rename, Move to Trash; New folder and New text file *inside it* and *next to it*;
-  Open in Terminal (inside), Open in Terminal app.
+  Copy path, Rename, Move to Trash; New folder and New text file *inside it* and *next to it*
+  (in a New ▸ submenu, like Explorer); Open in Terminal (inside), Open in Terminal app.
 - **On empty space:** New folder, New text file, New Markdown file, Paste, Copy path, Pin this
   folder, Open in Terminal, Open in Terminal app, Sort by, View.
+- Menu items show their key shortcut.
 - A new item appears with its name selected for typing, like Windows. Esc keeps the default name.
+  When it is made inside a folder that no pane shows, the pane opens that folder first.
 
 ### 6.6 File actions
 
@@ -127,7 +129,9 @@ inside the window. It is the app you open for everyday file work instead of Find
 - Drag and drop: between panes, onto a folder row, onto Favorites (pins it), and to and from other
   apps. Same disk: move. Other disk: copy. ⌥ forces copy, ⌘ forces move. A badge says what will
   happen.
-- Name clash: Replace, Skip or Keep both, with "Do this for all".
+- Name clash: Replace, Skip or Keep both, with "Do this for all" when more items follow, or Stop
+  (Esc). The question shows the size and date of both items.
+- After an action the status bar says what it did, with Undo where it can be undone.
 - Long copies show progress in the status bar, can be stopped, and never block the window.
 - Undo (⌘Z) for rename, move, copy, new item and Trash.
 - Rename in place with F2.
