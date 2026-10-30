@@ -1,0 +1,35 @@
+name: Release
+
+# Push a version tag (git tag v0.1.0 && git push origin v0.1.0) to build the disk image and
+# publish it as a GitHub Release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # the build number is the commit count
+      - name: Use the newest Xcode on the runner
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          xcodebuild -version
+          swift --version
+      - name: Unit tests
+        run: LUKSFER_SWIFT=test scripts/build.sh
+      - name: Build the disk image
+        run: scripts/release.sh "$GITHUB_REF_NAME"
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          dist="$HOME/Library/Caches/luksfer-dev/release"
+          gh release create "$GITHUB_REF_NAME" --title "Luksfer $version" --generate-notes \
+            "$dist/Luksfer-$version.dmg" "$dist/Luksfer-$version.dmg.sha256"

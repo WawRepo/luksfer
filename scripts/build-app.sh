@@ -1,12 +1,14 @@
 #!/bin/zsh
 # Builds Luksfer.app into ~/Library/Caches/luksfer-dev/dist/ (release; pass --debug for a debug build).
 # Start it with: open ~/Library/Caches/luksfer-dev/dist/Luksfer.app
+# LUKSFER_VERSION sets the version (default 0.1.0). LUKSFER_SIGN_IDENTITY picks the signing
+# certificate; "-" signs ad hoc. LUKSFER_DIST changes the output folder.
 set -eu
 root="${0:A:h:h}"
 config=release
 [[ "${1:-}" == "--debug" ]] && config=debug
 scratch="${LUKSFER_SCRATCH:-$HOME/Library/Caches/luksfer-dev/build/${root:t}}"
-dist="$HOME/Library/Caches/luksfer-dev/dist"
+dist="${LUKSFER_DIST:-$HOME/Library/Caches/luksfer-dev/dist}"
 app="$dist/Luksfer.app"
 
 "$root/scripts/build.sh" -c "$config" --product Luksfer
@@ -26,6 +28,7 @@ cp "$root/Resources/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"
 # The licenses of the third-party code compiled into the app (SwiftTerm and what it includes).
 cp "$root/THIRD_PARTY_NOTICES.md" "$app/Contents/Resources/THIRD_PARTY_NOTICES.md"
 
+version="${LUKSFER_VERSION:-0.1.0}"
 build_number=$(git -C "$root" rev-list --count HEAD 2>/dev/null || echo 1)
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -37,7 +40,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>Luksfer</string>
   <key>CFBundleExecutable</key><string>Luksfer</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleShortVersionString</key><string>$version</string>
   <key>CFBundleVersion</key><string>$build_number</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleIconName</key><string>AppIcon</string>
@@ -59,10 +62,11 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# Sign with the local development certificate if there is one (keeps macOS privacy
-# permissions across rebuilds), else ad hoc.
-identity=$(security find-identity -p codesigning -v 2>/dev/null | awk -F'"' '/Apple Development/ {print $2; exit}')
-codesign --force --sign "${identity:--}" --timestamp=none "$app" 2> /dev/null
+# By default, sign with the local development certificate if there is one (macOS privacy
+# permissions and Keychain access then stay across rebuilds), else ad hoc.
+identity="${LUKSFER_SIGN_IDENTITY:-$(security find-identity -p codesigning -v 2>/dev/null | awk -F'"' '/Apple Development/ {print $2; exit}')}"
+identity="${identity:--}"
+codesign --force --sign "$identity" --timestamp=none "$app" 2> /dev/null
 signed="ad hoc"
-[[ -n "$identity" ]] && signed="development certificate"
-echo "Built $app ($config, build $build_number, signed: $signed)"
+[[ "$identity" != "-" ]] && signed="certificate"
+echo "Built $app ($config, version $version, build $build_number, signed: $signed)"
