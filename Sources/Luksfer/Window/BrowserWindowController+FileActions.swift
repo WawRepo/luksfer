@@ -5,8 +5,19 @@ import LuksferCore
 extension BrowserWindowController {
     private var selection: [URL] { activePane.list.selectedURLs }
 
-    @objc func cut(_ sender: Any?) { FileActions.shared.cut(selection) }
-    @objc func copy(_ sender: Any?) { FileActions.shared.copy(selection) }
+    @objc func cut(_ sender: Any?) {
+        let urls = selection
+        guard !urls.isEmpty else { return }
+        FileActions.shared.cut(urls)
+        statusBar.showMessage("Cut \(FileActions.describe(urls)). Paste with ⌘V to move \(urls.count == 1 ? "it" : "them").")
+    }
+
+    @objc func copy(_ sender: Any?) {
+        let urls = selection
+        guard !urls.isEmpty else { return }
+        FileActions.shared.copy(urls)
+        statusBar.showMessage("Copied \(FileActions.describe(urls)). Paste with ⌘V.")
+    }
     @objc func paste(_ sender: Any?) { FileActions.shared.paste(into: activePane.folder, in: self) }
     @objc func pasteMove(_ sender: Any?) { FileActions.shared.paste(into: activePane.folder, forceMove: true, in: self) }
 

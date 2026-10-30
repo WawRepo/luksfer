@@ -340,9 +340,14 @@ enum SelfTest {
 
         list.select([folder.appendingPathComponent("New text file.txt")], scroll: false)
         w.copy(nil)
+        check("Copy says what it did", w.statusBar.message == "Copied “New text file.txt”. Paste with ⌘V.")
         w.paste(nil)
         await settle()
         check("copy + paste in the same folder makes a copy", names(folder).contains("New text file copy.txt"))
+        check("Paste says what it did", w.statusBar.message == "Copied “New text file copy.txt” to “\(folder.lastPathComponent)”")
+        w.activePane.copyPath()
+        check("Copy path says what it did", w.statusBar.message == "Copied the path"
+              && FileClipboard.pasteboard.string(forType: .string) == list.selectedURLs.first?.path)
 
         FileActions.shared.rename(folder.appendingPathComponent("New text file copy.txt"), to: "notes.md", in: w)
         await settle()
@@ -374,9 +379,11 @@ enum SelfTest {
         w.moveToTrash(nil)
         await settle()
         check("move to Trash", !names(folder).contains("notes.md") && !names(folder).contains("New folder"))
-        undo.undo()
+        check("Trash says what it did, with Undo", w.statusBar.message == "Moved 2 items to the Trash")
+        button("Undo", in: w.statusBar)?.performClick(nil)
         await settle()
-        check("undo Trash puts both back", names(folder).isSuperset(of: ["notes.md", "New folder"]))
+        check("Undo in the status bar puts both back", names(folder).isSuperset(of: ["notes.md", "New folder"]))
+        check("the message goes after Undo", w.statusBar.message.isEmpty)
         undo.redo()
         await settle()
         check("redo Trash", !names(folder).contains("notes.md"))

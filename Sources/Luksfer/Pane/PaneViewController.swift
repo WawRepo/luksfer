@@ -11,6 +11,7 @@ protocol PaneDelegate: AnyObject {
     func pane(_ pane: PaneViewController, menuFor items: [FileItem]) -> NSMenu?
     func pane(_ pane: PaneViewController, rename item: FileItem, to name: String)
     func pane(_ pane: PaneViewController, drop urls: [URL], into folder: URL, operation: DropOperation) -> Bool
+    func pane(_ pane: PaneViewController, didCopyPaths count: Int)
 }
 
 /// One pane: back, forward and up, the path bar, Copy path, the search box, and the file list.
@@ -289,8 +290,10 @@ final class PaneViewController: NSViewController {
 
     @objc func copyPath() {
         let urls = list.selectedURLs.isEmpty ? [folder] : list.selectedURLs
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(urls.map(\.path).joined(separator: "\n"), forType: .string)
+        let pasteboard = FileClipboard.pasteboard   // a private one in self-test runs
+        pasteboard.clearContents()
+        pasteboard.setString(urls.map(\.path).joined(separator: "\n"), forType: .string)
+        delegate?.pane(self, didCopyPaths: urls.count)
     }
 
     func focusSearch() { view.window?.makeFirstResponder(searchField) }

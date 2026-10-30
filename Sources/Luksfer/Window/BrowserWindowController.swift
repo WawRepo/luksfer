@@ -377,6 +377,10 @@ extension BrowserWindowController: PaneDelegate {
         FileActions.shared.transfer(urls, into: folder, operation: operation, in: self)
         return true
     }
+
+    func pane(_ pane: PaneViewController, didCopyPaths count: Int) {
+        statusBar.showMessage(count == 1 ? "Copied the path" : "Copied \(count) paths")
+    }
 }
 
 // MARK: - Sidebar events

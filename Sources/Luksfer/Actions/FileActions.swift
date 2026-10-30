@@ -76,27 +76,30 @@ final class FileActions {
     func transfer(_ urls: [URL], into folder: URL, operation: DropOperation, in window: BrowserWindowController, then: (() -> Void)? = nil) {
         let verb = operation == .move ? "Moving" : "Copying"
         let resolver = clashResolver(for: window)
-        run(in: window, title: "\(verb) \(describe(urls))", select: folder) { [engine] progress in
+        run(in: window, title: "\(verb) \(Self.describe(urls))", select: folder) { [engine] progress in
             operation == .move
                 ? try await engine.move(urls, into: folder, resolveClash: resolver, progress: progress)
                 : try await engine.copy(urls, into: folder, resolveClash: resolver, progress: progress)
+        } done: { change in
+            let items = change.createdItems.isEmpty ? urls : change.createdItems
+            return "\(operation == .move ? "Moved" : "Copied") \(Self.describe(items)) to “\(folder.displayName)”"
         } then: { then?() }
     }
 
     func duplicate(_ urls: [URL], in window: BrowserWindowController) {
         guard let folder = urls.first?.deletingLastPathComponent() else { return }
-        run(in: window, title: "Duplicating \(describe(urls))", select: folder) { [engine] progress in
+        run(in: window, title: "Duplicating \(Self.describe(urls))", select: folder) { [engine] progress in
             try await engine.duplicate(urls, progress: progress)
-        }
+        } done: { _ in "Duplicated \(Self.describe(urls))" }
     }
 
     // MARK: Trash and delete
 
     func trash(_ urls: [URL], in window: BrowserWindowController) {
         guard !urls.isEmpty else { return }
-        run(in: window, title: "Moving \(describe(urls)) to the Trash", select: nil) { [engine] _ in
+        run(in: window, title: "Moving \(Self.describe(urls)) to the Trash", select: nil) { [engine] _ in
             try await engine.trash(urls)
-        }
+        } done: { _ in "Moved \(Self.describe(urls)) to the Trash" }
     }
 
     /// Deletes for good, after the user confirms. This is the only change that cannot be undone.
@@ -112,7 +115,12 @@ final class FileActions {
         alert.beginSheetModal(for: w) { [weak self] response in
             guard response == .alertFirstButtonReturn, let self else { return }
             Task { @MainActor in
-                do { try await self.engine.deletePermanently(urls) } catch { window.showError(error) }
+                do {
+                    try await self.engine.deletePermanently(urls)
+                    window.statusBar.showMessage("Deleted \(Self.describe(urls))")
+                } catch {
+                    window.showError(error)
+                }
                 window.panes.forEach { $0.reload() }
             }
         }
@@ -156,7 +164,7 @@ final class FileActions {
         let base = urls.count == 1 ? urls[0].deletingPathExtension().lastPathComponent : "Archive"
         let name = FileOperationEngine.uniqueName("\(base).zip", in: folder, style: .numbered)
         let zip = folder.appendingPathComponent(name)
-        window.statusBar.showProgress("Compressing \(describe(urls))", fraction: nil)
+        window.statusBar.showProgress("Compressing \(Self.describe(urls))", fraction: nil)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let p = Process()
             if urls.count == 1 {
@@ -179,6 +187,7 @@ final class FileActions {
                     }
                 }
                 self.reloadPanes(in: window, showing: [folder], select: [zip])
+                window.statusBar.showMessage("Compressed to “\(zip.lastPathComponent)”", undo: self.undoLast)
             }
         }
     }
@@ -187,18 +196,23 @@ final class FileActions {
 
     func cancelCurrent() { running?.cancel() }
 
+    /// Runs a file job with progress in the status bar. `done` gives the message shown after it
+    /// (with an Undo button).
     private func run(in window: BrowserWindowController, title: String, select folder: URL?,
                      _ work: @escaping (@escaping FileOperationEngine.ProgressHandler) async throws -> FileChange,
+                     done: @escaping (FileChange) -> String,
                      then: (() -> Void)? = nil) {
         let status = window.statusBar
         let started = Date()
+        let finished = Flag()
         pending += 1
         // Short operations never flash the progress bar.
         let show = DispatchWorkItem { status.showProgress(title, fraction: nil) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: show)
         let progress: FileOperationEngine.ProgressHandler = { p in
             DispatchQueue.main.async {
-                guard Date().timeIntervalSince(started) > 0.4 else { return }
+                // A report that arrives after the end must not bring the progress back.
+                guard !finished.isSet, Date().timeIntervalSince(started) > 0.4 else { return }
                 let detail = p.totalBytes > 0 ? "\(Formatters.size(p.completedBytes)) of \(Formatters.size(p.totalBytes))" : "\(p.completedItems) of \(p.totalItems)"
                 status.showProgress("\(title) — \(detail)", fraction: p.fraction)
             }
@@ -209,6 +223,10 @@ final class FileActions {
                 let change = try await work(progress)
                 self.record(change)
                 self.reloadPanes(in: window, showing: change.touchedFolders, select: change.createdItems)
+                finished.isSet = true
+                show.cancel()
+                status.hideProgress()
+                if !change.isEmpty { status.showMessage(done(change), undo: self.undoLast) }
                 then?()
             } catch let error as FileOperationError {
                 if let partial = error.partialChange { self.record(partial) }
@@ -217,12 +235,20 @@ final class FileActions {
             } catch {
                 window.showError(error)
             }
+            finished.isSet = true
             show.cancel()
             status.hideProgress()
             self.running = nil
             self.pending -= 1
         }
         running = task
+    }
+
+    /// The status bar's Undo button: undoes the newest step (the message goes away as soon as
+    /// another step is added, so that is the step the message names).
+    private func undoLast() {
+        let manager = undoManager
+        if manager.canUndo, !isBusy { manager.undo() }
     }
 
     /// Registers a change on the shared undo stack. Undo and redo both apply the inverse change,
@@ -295,9 +321,15 @@ final class FileActions {
         }
     }
 
-    private func describe(_ urls: [URL]) -> String {
+    /// "“name.txt”" for one item, "3 items" for more.
+    static func describe(_ urls: [URL]) -> String {
         urls.count == 1 ? "“\(urls[0].lastPathComponent)”" : "\(urls.count) items"
     }
+}
+
+/// Set once a file job has ended (read on the main queue only).
+private final class Flag: @unchecked Sendable {
+    var isSet = false
 }
 
 /// Holds the inverse of an undone change until the engine returns it.
