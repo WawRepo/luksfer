@@ -1,4 +1,4 @@
-# Luksfer
+<h1 align="center"><img src="docs/brand/logo.png" alt="Luksfer" width="380"></h1>
 
 Luksfer is a native macOS file explorer that works like Windows Explorer. "Luksfer" is Polish
 for a glass block, the brick that lets light through a wall. Its working name was Okno (Polish
@@ -53,18 +53,19 @@ sandbox folders, never your real ones.
 ## Project layout
 
 ```text
-Package.swift            Swift package, no Xcode project
-Sources/LuksferCore/        file system logic, no UI: listing, file operations and undo, paths,
-                         navigation, settings, shell integration
-Sources/Luksfer/            the AppKit app: window, panes, file list, path bar, sidebar, menus,
-                         terminal panel
-Tests/LuksferCoreTests/     unit tests for LuksferCore
-Spike/                   the speed and feasibility checks that chose the stack
-Resources/               app icon
-scripts/                 build, test and icon scripts
-docs/PRD.md              product requirements
-docs/spike-report.md     spike results and the stack choice
-docs/mockup/             source of the clickable mockup
+Package.swift             Swift package, no Xcode project
+Sources/LuksferCore/      file system logic, no UI: listing, file operations and undo, paths,
+                          navigation, settings, shell integration
+Sources/Luksfer/          the AppKit app: window, panes, file list, path bar, sidebar, menus,
+                          terminal panel
+Tests/LuksferCoreTests/   unit tests for LuksferCore
+Spike/                    the speed and feasibility checks that chose the stack
+Resources/                app icon, built by scripts/make-icon.py
+scripts/                  build, test and icon scripts
+docs/PRD.md               product requirements
+docs/spike-report.md      spike results and the stack choice
+docs/mockup/              source of the clickable mockup
+docs/brand/               the icon and logo source image, and the logo
 ```
 
 ## License
