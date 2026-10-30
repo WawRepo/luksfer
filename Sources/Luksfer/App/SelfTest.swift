@@ -208,6 +208,13 @@ enum SelfTest {
         await wait()
         let left = w.panes[0].list, right = w.panes[1].list
 
+        check("only the active pane is marked", w.panes[0].showsAsActive && !w.panes[1].showsAsActive)
+        w.paneDidBecomeActive(w.panes[1])
+        await wait(0.3)
+        check("the mark follows the active pane", w.panes[1].showsAsActive && !w.panes[0].showsAsActive)
+        DevHooks.snapshot(to: folder.deletingLastPathComponent().appendingPathComponent("active-pane.png"))
+        w.setActive(0)
+
         let drag = SelfTestDrag([file])
         check("drop into the other pane is allowed", right.tableView(right.tableView, validateDrop: drag, proposedRow: -1, proposedDropOperation: .above) == .move)
         check("drop into its own folder does nothing", left.tableView(left.tableView, validateDrop: drag, proposedRow: -1, proposedDropOperation: .above) == [])
@@ -269,6 +276,7 @@ enum SelfTest {
         let inner = folder.appendingPathComponent("New folder")
         func same(_ a: URL?, _ b: URL) -> Bool { a?.resolvingSymlinksInPath().standardizedFileURL.path == b.resolvingSymlinksInPath().standardizedFileURL.path }
         w.setTwoPanes(false)
+        check("one pane shows no active mark", !w.activePane.showsAsActive)
         w.activePane.navigate(to: folder)
         await wait()
         w.openTerminal(at: folder, focus: false)

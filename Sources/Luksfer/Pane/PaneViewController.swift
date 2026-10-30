@@ -29,7 +29,8 @@ final class PaneViewController: NSViewController {
     private let copyPathButton = PaneViewController.iconButton("link", "Copy path")
     let searchField = NSSearchField()
     private let activeMark = NSBox()
-    private let header = NSView()
+    private let header = PaneHeaderView()
+    private var headerRow: NSStackView?
     private let spinner = NSProgressIndicator()
     private let messageBox = NSStackView()
     private let messageLabel = NSTextField(wrappingLabelWithString: "")
@@ -38,17 +39,13 @@ final class PaneViewController: NSViewController {
 
     var folder: URL { history.current }
 
-    var isActive = false {
-        didSet {
-            activeMark.fillColor = isActive ? .controlAccentColor : .clear
-            pathBar.isActive = isActive
-        }
-    }
+    var isActive = false { didSet { updateActiveLook() } }
 
-    /// The accent line on top of the active pane only shows when two panes are open.
-    var showsActiveMark = false {
-        didSet { activeMark.isHidden = !showsActiveMark }
-    }
+    /// Two panes are open, so the active one is marked.
+    var showsActiveMark = false { didSet { updateActiveLook() } }
+
+    /// The pane shows the active marks (the self-test reads it).
+    var showsAsActive: Bool { !activeMark.isHidden }
 
     init(folder: URL, sort: FileSortOrder) {
         history = NavigationHistory(start: folder)
@@ -65,7 +62,7 @@ final class PaneViewController: NSViewController {
 
         activeMark.boxType = .custom
         activeMark.borderWidth = 0
-        activeMark.fillColor = .clear
+        activeMark.fillColor = .controlAccentColor
         activeMark.isHidden = true
         activeMark.translatesAutoresizingMaskIntoConstraints = false
 
@@ -100,6 +97,7 @@ final class PaneViewController: NSViewController {
         row.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
         row.setCustomSpacing(8, after: upButton)
         row.translatesAutoresizingMaskIntoConstraints = false
+        headerRow = row
         header.translatesAutoresizingMaskIntoConstraints = false
         header.addSubview(row)
 
@@ -130,7 +128,7 @@ final class PaneViewController: NSViewController {
             activeMark.topAnchor.constraint(equalTo: root.topAnchor),
             activeMark.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             activeMark.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            activeMark.heightAnchor.constraint(equalToConstant: 2),
+            activeMark.heightAnchor.constraint(equalToConstant: 3),
             header.topAnchor.constraint(equalTo: root.topAnchor),
             header.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             header.trailingAnchor.constraint(equalTo: root.trailingAnchor),
@@ -161,7 +159,18 @@ final class PaneViewController: NSViewController {
         pathWidth.isActive = true
         searchField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
+        updateActiveLook()
         show(folder, select: nil)
+    }
+
+    /// In two panes the active pane has an accent line on top, a lightly tinted header and an
+    /// accent path bar border; the other pane's header is dimmed. One pane shows none of it.
+    private func updateActiveLook() {
+        let marked = showsActiveMark && isActive
+        activeMark.isHidden = !marked
+        header.tint = marked ? NSColor.controlAccentColor.withAlphaComponent(0.08) : nil
+        headerRow?.alphaValue = showsActiveMark && !isActive ? 0.6 : 1
+        pathBar.isActive = marked
     }
 
     private static func iconButton(_ symbol: String, _ label: String) -> NSButton {
@@ -299,6 +308,17 @@ final class PaneViewController: NSViewController {
     func focusSearch() { view.window?.makeFirstResponder(searchField) }
 
     @objc private func searchChanged() { list.filterQuery = searchField.stringValue }
+}
+
+/// The pane's top strip. The active one of two panes gets a light accent tint.
+private final class PaneHeaderView: NSView {
+    var tint: NSColor? { didSet { needsDisplay = true } }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let tint else { return }
+        tint.setFill()
+        dirtyRect.intersection(bounds).fill()
+    }
 }
 
 extension PaneViewController: PathBarViewDelegate {

@@ -28,8 +28,8 @@ final class PathBarView: NSView {
 
     /// The folder shown. Setting it redraws the crumbs and calls no delegate method.
     var folder: URL { didSet { reloadCrumbs() } }
-    /// The bar's pane is the active one. Drawn the same for now: the pane shows the active mark.
-    var isActive = true
+    /// The bar's pane is the active one of two panes: the border takes the accent colour.
+    var isActive = false { didSet { if oldValue != isActive { needsDisplay = true } } }
     private(set) var isEditing = false
     /// Hidden folders appear in the › menus (follows the pane's "show hidden files").
     var showsHiddenFolders = false
@@ -221,6 +221,7 @@ final class PathBarView: NSView {
     private var borderColor: NSColor {
         if hasError { return .systemRed }
         if isEditing { return .controlAccentColor }
+        if isActive { return NSColor.controlAccentColor.withAlphaComponent(0.55) }
         return .separatorColor
     }
 
