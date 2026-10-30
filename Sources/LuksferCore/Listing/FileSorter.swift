@@ -13,8 +13,8 @@ public struct FileSortOrder: Codable, Equatable, Sendable {
     }
 }
 
-/// Sorts a listing. Folders always come first, like Windows Explorer; names compare like Finder
-/// ("file 2" before "file 10").
+/// Sorts a listing like Windows Explorer: folders come first in an ascending sort and last in a
+/// descending one (the whole list turns around). Names compare like Finder ("file 2" before "file 10").
 public enum FileSorter {
     public static func sort(_ items: [FileItem], by order: FileSortOrder) -> [FileItem] {
         // NSString compare is 40% faster than the same call on Swift String (spike).
@@ -23,7 +23,7 @@ public enum FileSorter {
         var indices = Array(items.indices)
         indices.sort { i, j in
             let a = items[i], b = items[j]
-            if a.isFolder != b.isFolder { return a.isFolder }
+            if a.isFolder != b.isFolder { return a.isFolder == order.ascending }
             var result: ComparisonResult
             switch order.key {
             case .name: result = .orderedSame

@@ -34,7 +34,7 @@ final class ListingTests: XCTestCase {
         XCTAssertThrowsError(try DirectoryReader.read(box.root.appendingPathComponent("nope"), includeHidden: false))
     }
 
-    func testSortPutsFoldersFirstAndUsesFinderOrder() throws {
+    func testSortPutsFoldersFirstAscendingAndLastDescending() throws {
         let box = CoreSandbox()
         for n in ["file 10.txt", "file 2.txt", "B.txt", "a.txt"] { box.file(n) }
         box.folder("zeta")
@@ -43,16 +43,16 @@ final class ListingTests: XCTestCase {
         let names = FileSorter.sort(items, by: FileSortOrder(key: .name, ascending: true)).map(\.name)
         XCTAssertEqual(names, ["Alpha", "zeta", "a.txt", "B.txt", "file 2.txt", "file 10.txt"])
         let down = FileSorter.sort(items, by: FileSortOrder(key: .name, ascending: false)).map(\.name)
-        XCTAssertEqual(down, ["zeta", "Alpha", "file 10.txt", "file 2.txt", "B.txt", "a.txt"])
+        XCTAssertEqual(down, ["file 10.txt", "file 2.txt", "B.txt", "a.txt", "zeta", "Alpha"])
     }
 
-    func testSortBySizeKeepsFoldersFirst() throws {
+    func testSortBySizeTurnsFoldersAroundToo() throws {
         let box = CoreSandbox()
         box.file("big.txt", String(repeating: "x", count: 100))
         box.file("small.txt", "x")
         box.folder("dir")
         let items = try DirectoryReader.read(box.root, includeHidden: false)
-        XCTAssertEqual(FileSorter.sort(items, by: FileSortOrder(key: .size, ascending: false)).map(\.name), ["dir", "big.txt", "small.txt"])
+        XCTAssertEqual(FileSorter.sort(items, by: FileSortOrder(key: .size, ascending: false)).map(\.name), ["big.txt", "small.txt", "dir"])
         XCTAssertEqual(FileSorter.sort(items, by: FileSortOrder(key: .size, ascending: true)).map(\.name), ["dir", "small.txt", "big.txt"])
     }
 

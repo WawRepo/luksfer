@@ -199,7 +199,9 @@ enum SelfTest {
         let byName = pane.list.items.map(\.name)
         pane.list.sortOrder = FileSortOrder(key: .name, ascending: false)
         let reversed = pane.list.items.map(\.name)
-        check("folders stay first when sorted Z to A", reversed.first == "New folder" && reversed != byName)
+        let firstFolder = pane.list.items.firstIndex(where: \.isFolder) ?? 0
+        check("Z to A puts files first and folders last (like Explorer)", firstFolder > 0
+              && pane.list.items[firstFolder...].allSatisfy(\.isFolder) && reversed != byName)
         pane.list.sortOrder = FileSortOrder()
 
         FileManager.default.createFile(atPath: folder.appendingPathComponent(".secret").path, contents: nil)

@@ -78,7 +78,8 @@ inside the window. It is the app you open for everyday file work instead of Find
 ### 6.2 Details view (default)
 
 - Columns: Name, Date modified, Type, Size. Optional: Date created, Extension. Columns can be
-  resized, moved and hidden. Click a column header to sort; folders always come first.
+  resized, moved and hidden. Click a column header to sort. Like Explorer, folders come first in
+  an ascending sort and last in a descending one.
 - Details is the default for every folder. A pane can switch to Icons (with thumbnails).
 - File extensions always show. Hidden files show with ⇧⌘. (the Finder key).
 - Folder size stays empty, like Windows. "Calculate size" is on the context menu (later).
