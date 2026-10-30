@@ -269,13 +269,13 @@ final class PaneViewController: NSViewController {
         upButton.isEnabled = !folder.isRootFolder
     }
 
-    /// The empty-folder and no-match messages; errors win.
+    /// The loading, empty-folder and no-match messages; errors win.
     private func updateMessage() {
         guard isViewLoaded, list.loadError == nil else { return }
         guard list.items.isEmpty else { messageBox.isHidden = true; return }
         let query = searchField.stringValue
-        messageLabel.stringValue = query.isEmpty
-            ? "This folder is empty.\nRight-click to add a folder or a file."
+        messageLabel.stringValue = list.isLoading ? "Loading…"
+            : query.isEmpty ? "This folder is empty.\nRight-click to add a folder or a file."
             : "Nothing here matches “\(query)”."
         messageButton.isHidden = true
         messageBox.isHidden = false

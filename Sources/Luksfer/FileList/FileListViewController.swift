@@ -24,6 +24,10 @@ final class FileListViewController: NSViewController {
     private(set) var allItems: [FileItem] = []
     private(set) var items: [FileItem] = []
     private(set) var loadError: Error?
+    /// The listing of a newly opened folder has not arrived yet.
+    private(set) var isLoading = false
+    /// Self-test only: every listing takes this many seconds longer (a slow folder).
+    static var listDelayForTests: TimeInterval = 0
     var sortOrder = FileSortOrder() {
         didSet { if oldValue != sortOrder { applyItems(keepSelection: true); updateSortIndicator() } }
     }
@@ -147,10 +151,25 @@ final class FileListViewController: NSViewController {
         let hidden = AppServices.shared.settings.showHidden
         let previousSelection = isNewFolder ? [] : selectedURLs
         let started = ProcessInfo.processInfo.systemUptime
+        if isNewFolder {
+            // The old folder's rows must not act for the new one: nothing stays selected, and when
+            // the listing takes more than a moment the rows go ("Loading…").
+            isLoading = true
+            loadError = nil
+            tableView.deselectAll(nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                guard let self, gen == self.generation, self.isLoading else { return }
+                self.allItems = []
+                self.applyItems(keepSelection: false)
+            }
+        }
+        let delay = Self.listDelayForTests
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            if delay > 0 { Thread.sleep(forTimeInterval: delay) }
             let result = Result { try DirectoryReader.read(folder, includeHidden: hidden) }
             DispatchQueue.main.async { [weak self] in
                 guard let self, gen == self.generation else { return }
+                self.isLoading = false
                 switch result {
                 case .success(let list):
                     self.loadError = nil

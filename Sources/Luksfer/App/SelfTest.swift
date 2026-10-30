@@ -157,6 +157,19 @@ enum SelfTest {
         await wait()
         check("⌘↑ goes up", pane.folder.standardizedFileURL == folder.standardizedFileURL)
 
+        // A slow folder: the old rows go, so nothing acts on the old folder while it loads.
+        pane.list.select([folder.appendingPathComponent("notes.md")], scroll: false)
+        FileListViewController.listDelayForTests = 1.5
+        pane.navigate(to: inner)
+        await wait(0.6)
+        let trashItem = NSMenuItem(title: "", action: #selector(BrowserWindowController.moveToTrash(_:)), keyEquivalent: "")
+        check("old rows go while a slow folder loads", pane.list.isLoading && pane.list.items.isEmpty && !w.validateMenuItem(trashItem))
+        FileListViewController.listDelayForTests = 0
+        check("the slow folder shows once it has loaded", await waitFor(5) { !pane.list.isLoading } && !pane.list.items.isEmpty)
+        pane.goBack()
+        await wait()
+        pane.list.focus()
+
         pane.list.select([folder.appendingPathComponent("notes.md")], scroll: false)
         key(0x20, to: table)
         await wait(1.0)
