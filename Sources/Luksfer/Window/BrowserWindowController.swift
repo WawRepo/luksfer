@@ -271,6 +271,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     func showError(_ error: Error) {
         guard let window else { return }
+        if ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] != nil {
+            FileHandle.standardError.write(Data("selftest: error shown: \(error.localizedDescription)\n".utf8))
+        }
         NSAlert(error: error).beginSheetModal(for: window)
     }
 
@@ -291,10 +294,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         onClose?(self)
     }
 
-    /// Undo and Redo change files. While the terminal has focus they get an empty stack, so ⌘Z
-    /// never undoes a file action by surprise.
+    /// Undo and Redo change files. While the terminal has focus, or a file job still runs, they get
+    /// an empty stack, so ⌘Z never undoes a file action by surprise or an older step too early.
     func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? {
-        terminalHasFocus ? terminalUndoManager : AppServices.shared.undoManager
+        terminalHasFocus || FileActions.shared.isBusy ? terminalUndoManager : AppServices.shared.undoManager
     }
 
     var terminalHasFocus: Bool { window?.firstResponder is ShellTerminalView }

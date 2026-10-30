@@ -15,6 +15,11 @@ final class FileActions {
         .map { FolderTrasher(folder: URL(fileURLWithPath: $0, isDirectory: true)) as Trasher } ?? SystemTrasher())
     private var undoManager: UndoManager { AppServices.shared.undoManager }
     private var running: Task<Void, Never>?
+    /// File jobs and undos still running. Undo waits for them (see `isBusy`).
+    private var pending = 0
+    /// A file job or an undo is still running. Undo and Redo stay off until it ends, so ⌘Z never
+    /// undoes an older step while a slow copy finishes.
+    var isBusy: Bool { pending > 0 }
     private(set) var cutURLs: Set<URL> = []
     private var cutChangeCount = -1
 
@@ -167,12 +172,11 @@ final class FileActions {
             DispatchQueue.main.async {
                 window.statusBar.hideProgress()
                 guard let self, p.terminationStatus == 0 else { NSSound.beep(); return }
-                self.undoManager.registerUndo(withTarget: self) { target in
+                self.registerStep("Compress") { target in
                     Task { @MainActor in
                         do { _ = try await target.engine.trash([zip]) } catch { window.showError(error) }
                     }
                 }
-                self.undoManager.setActionName("Compress")
                 self.reloadPanes(in: window, showing: [folder], select: [zip])
             }
         }
@@ -187,6 +191,7 @@ final class FileActions {
                      then: (() -> Void)? = nil) {
         let status = window.statusBar
         let started = Date()
+        pending += 1
         // Short operations never flash the progress bar.
         let show = DispatchWorkItem { status.showProgress(title, fraction: nil) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: show)
@@ -214,6 +219,7 @@ final class FileActions {
             show.cancel()
             status.hideProgress()
             self.running = nil
+            self.pending -= 1
         }
         running = task
     }
@@ -222,8 +228,25 @@ final class FileActions {
     /// which the engine returns, so the redo is registered while the undo runs.
     private func record(_ change: FileChange) {
         guard !change.isEmpty else { return }
-        undoManager.registerUndo(withTarget: self) { target in target.reverse(change) }
-        undoManager.setActionName(change.actionName)
+        registerStep(change.actionName) { target in target.reverse(change) }
+    }
+
+    /// Registers one undo step as its own closed group. A job that ends in a task (not during an
+    /// event) would leave AppKit's automatic group open until the next event, so the next action
+    /// joined it and one ⌘Z undid both.
+    private func registerStep(_ name: String, _ handler: @escaping (FileActions) -> Void) {
+        let manager = undoManager
+        guard manager.groupingLevel == 0, !manager.isUndoing, !manager.isRedoing else {
+            manager.registerUndo(withTarget: self, handler: handler)
+            manager.setActionName(name)
+            return
+        }
+        manager.groupsByEvent = false
+        manager.beginUndoGrouping()
+        manager.registerUndo(withTarget: self, handler: handler)
+        manager.setActionName(name)
+        manager.endUndoGrouping()
+        manager.groupsByEvent = true
     }
 
     private func reverse(_ change: FileChange) {
@@ -235,7 +258,9 @@ final class FileActions {
         }
         undoManager.setActionName(change.actionName)
         let window = NSApp.keyWindow?.windowController as? BrowserWindowController
+        pending += 1
         Task { @MainActor in
+            defer { self.pending -= 1 }
             do {
                 box.change = try await engine.undo(change)
             } catch let error as FileOperationError {
