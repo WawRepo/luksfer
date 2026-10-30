@@ -1,5 +1,6 @@
 import AppKit
 import OknoCore
+import Quartz
 
 /// An end-to-end check of the file actions in the running app, for test runs only.
 /// OKNO_SELFTEST=1 with OKNO_OPEN=<empty sandbox folder> and OKNO_TRASH_DIR=<sandbox trash>:
@@ -25,6 +26,87 @@ enum SelfTest {
     }
 
     private static func wait(_ seconds: Double = 0.6) async { try? await Task.sleep(for: .seconds(seconds)) }
+
+    /// Sends a key press to the view, as if typed.
+    private static func key(_ code: Int, _ flags: NSEvent.ModifierFlags = [], to view: NSView) {
+        let chars = String(Character(UnicodeScalar(UInt32(code))!))
+        guard let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+                                           windowNumber: view.window?.windowNumber ?? 0, context: nil, characters: chars,
+                                           charactersIgnoringModifiers: chars, isARepeat: false, keyCode: 0) else { return }
+        view.keyDown(with: event)
+    }
+
+    /// Milestone 2 and 4: keys, Quick Look, search, sort, hidden files, Favorites, pane switching.
+    private static func navigation(in folder: URL, window w: BrowserWindowController) async {
+        let inner = folder.appendingPathComponent("New folder")
+        w.setActive(0)
+        let pane = w.activePane
+        pane.navigate(to: folder)
+        await wait()
+        let table = pane.list.tableView
+        pane.list.focus()
+
+        pane.list.select([inner], scroll: false)
+        key(NSCarriageReturnCharacter, to: table)
+        await wait()
+        check("Enter opens a folder", pane.folder.standardizedFileURL == inner.standardizedFileURL)
+        key(NSDeleteCharacter, to: table)
+        await wait()
+        check("Backspace goes back", pane.folder.standardizedFileURL == folder.standardizedFileURL)
+        check("going back selects the folder you came from", pane.list.selectedItems.map(\.name) == ["New folder"])
+        key(NSDownArrowFunctionKey, .command, to: table)
+        await wait()
+        check("⌘↓ opens a folder", pane.folder.standardizedFileURL == inner.standardizedFileURL)
+        key(NSUpArrowFunctionKey, .command, to: table)
+        await wait()
+        check("⌘↑ goes up", pane.folder.standardizedFileURL == folder.standardizedFileURL)
+
+        pane.list.select([folder.appendingPathComponent("notes.md")], scroll: false)
+        key(0x20, to: table)
+        await wait(1.0)
+        check("Space opens Quick Look", QLPreviewPanel.sharedPreviewPanelExists() && QLPreviewPanel.shared().isVisible)
+        pane.list.toggleQuickLook()
+        await wait()
+        check("Quick Look closes", !QLPreviewPanel.shared().isVisible)
+        pane.list.focus()
+
+        pane.list.select([folder.appendingPathComponent("notes.md")], scroll: false)
+        key(NSF2FunctionKey, to: table)
+        await wait()
+        check("F2 starts rename", pane.list.isRenaming)
+        pane.list.focus()
+        await wait()
+
+        pane.list.filterQuery = "notes"
+        check("search box filters the list", pane.list.items.map(\.name) == ["notes.md"])
+        pane.list.filterQuery = ""
+
+        let byName = pane.list.items.map(\.name)
+        pane.list.sortOrder = FileSortOrder(key: .name, ascending: false)
+        let reversed = pane.list.items.map(\.name)
+        check("folders stay first when sorted Z to A", reversed.first == "New folder" && reversed != byName)
+        pane.list.sortOrder = FileSortOrder()
+
+        FileManager.default.createFile(atPath: folder.appendingPathComponent(".secret").path, contents: nil)
+        pane.reload()
+        await wait()
+        check("hidden files stay hidden", !pane.list.items.contains { $0.name == ".secret" })
+        w.toggleHiddenFiles(nil)
+        await wait()
+        check("Show Hidden Files shows them", pane.list.items.contains { $0.name == ".secret" })
+        w.toggleHiddenFiles(nil)
+        await wait()
+
+        AppServices.shared.pin([inner])
+        check("Pin to Favorites", AppServices.shared.isFavorite(inner))
+        AppServices.shared.unpin(inner)
+        check("Unpin", !AppServices.shared.isFavorite(inner))
+
+        key(NSTabCharacter, to: table)
+        await wait()
+        check("Tab switches to the other pane", w.activePane === w.panes[1])
+        w.setActive(0)
+    }
 
     private static func run(in folder: URL) async {
         await wait(1.5)
@@ -94,6 +176,8 @@ enum SelfTest {
         await wait(1.2)
         check("copy to the other pane's folder", names(folder.appendingPathComponent("New folder")).contains("notes.md") && names(folder).contains("notes.md"))
         check("other pane shows the copy", w.otherPane.list.items.contains { $0.name == "notes.md" })
+
+        await navigation(in: folder, window: w)
 
         DevHooks.snapshot(to: folder.deletingLastPathComponent().appendingPathComponent("selftest.png"))
         FileHandle.standardError.write(Data("selftest: \(failures == 0 ? "ALL PASSED" : "\(failures) FAILED")\n".utf8))

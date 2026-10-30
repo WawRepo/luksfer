@@ -184,8 +184,13 @@ final class PaneViewController: NSViewController {
         show(target, select: select)
     }
 
-    @objc func goBack() { if let url = history.goBack() { show(url, select: nil) } }
-    @objc func goForward() { if let url = history.goForward() { show(url, select: nil) } }
+    @objc func goBack() { let from = folder; if let url = history.goBack() { show(url, select: cameFrom(from, into: url)) } }
+    @objc func goForward() { let from = folder; if let url = history.goForward() { show(url, select: cameFrom(from, into: url)) } }
+
+    /// Going back to a parent selects the folder you came from (like Explorer).
+    private func cameFrom(_ from: URL, into url: URL) -> [URL]? {
+        from.deletingLastPathComponent().standardizedFileURL == url.standardizedFileURL ? [from] : nil
+    }
 
     @objc func goUp() {
         guard !folder.isRootFolder else { return }
