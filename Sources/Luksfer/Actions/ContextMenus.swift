@@ -2,7 +2,8 @@ import AppKit
 import LuksferCore
 
 /// Right-click menus for a file, a folder and empty space (PRD §6.5). New folder and New text file
-/// are on every menu: next to a file, inside or next to a folder, or in the current folder.
+/// are on every menu: next to a file, inside or next to a folder (in a New submenu, like
+/// Explorer), or in the current folder. Items show the main menu's key shortcut for the same action.
 enum ContextMenus {
     typealias W = BrowserWindowController
 
@@ -61,10 +62,7 @@ enum ContextMenus {
         add(menu, "Compress", #selector(W.compressItems(_:)), symbol: "archivebox")
         add(menu, "Move to Trash", #selector(W.moveToTrash(_:)), symbol: "trash")
         menu.addItem(.separator())
-        add(menu, "New Folder Inside", #selector(W.newFolder(_:)), symbol: "folder.badge.plus", target: item.url)
-        add(menu, "New Text File Inside", #selector(W.newTextFile(_:)), symbol: "doc.badge.plus", target: item.url)
-        add(menu, "New Folder Next to It", #selector(W.newFolder(_:)), symbol: "folder.badge.plus", target: pane.folder)
-        add(menu, "New Text File Next to It", #selector(W.newTextFile(_:)), symbol: "doc.badge.plus", target: pane.folder)
+        menu.addItem(newItems(inside: item.url, nextTo: pane.folder))
         menu.addItem(.separator())
         add(menu, "Open in Terminal", #selector(W.openInTerminal(_:)), symbol: "apple.terminal")
         add(menu, "Open in Terminal App", #selector(W.openInTerminalApp(_:)), symbol: "arrow.up.forward.app")
@@ -92,6 +90,21 @@ enum ContextMenus {
     }
 
     // MARK: Submenus
+
+    /// "New ▸" on a folder: a new folder or text file inside it, or next to it.
+    private static func newItems(inside folder: URL, nextTo parent: URL) -> NSMenuItem {
+        let item = NSMenuItem(title: "New", action: nil, keyEquivalent: "")
+        item.image = .symbol("plus.circle", nil)
+        let sub = NSMenu()
+        // ⇧⌘N and ⌥⌘N make items in the pane's folder, so only "next to it" shows them.
+        add(sub, "New Folder Inside", #selector(W.newFolder(_:)), symbol: "folder.badge.plus", target: folder, shortcut: false)
+        add(sub, "New Text File Inside", #selector(W.newTextFile(_:)), symbol: "doc.badge.plus", target: folder, shortcut: false)
+        sub.addItem(.separator())
+        add(sub, "New Folder Next to It", #selector(W.newFolder(_:)), symbol: "folder.badge.plus", target: parent)
+        add(sub, "New Text File Next to It", #selector(W.newTextFile(_:)), symbol: "doc.badge.plus", target: parent)
+        item.submenu = sub
+        return item
+    }
 
     private static func openWith(_ url: URL) -> NSMenuItem {
         let item = NSMenuItem(title: "Open With", action: nil, keyEquivalent: "")
@@ -145,10 +158,24 @@ enum ContextMenus {
         return item
     }
 
-    private static func add(_ menu: NSMenu, _ title: String, _ action: Selector, symbol: String, target: URL? = nil) {
+    private static func add(_ menu: NSMenu, _ title: String, _ action: Selector, symbol: String, target: URL? = nil,
+                            shortcut: Bool = true) {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.image = .symbol(symbol, nil)
         item.representedObject = target
+        if shortcut, let main = NSApp.mainMenu, let same = menuItem(for: action, in: main) {
+            item.keyEquivalent = same.keyEquivalent
+            item.keyEquivalentModifierMask = same.keyEquivalentModifierMask
+        }
         menu.addItem(item)
+    }
+
+    /// The main menu item with a key shortcut for `action`, if there is one.
+    private static func menuItem(for action: Selector, in menu: NSMenu) -> NSMenuItem? {
+        for item in menu.items {
+            if item.action == action, !item.keyEquivalent.isEmpty { return item }
+            if let sub = item.submenu, let found = menuItem(for: action, in: sub) { return found }
+        }
+        return nil
     }
 }

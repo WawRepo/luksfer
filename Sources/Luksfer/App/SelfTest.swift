@@ -128,6 +128,20 @@ enum SelfTest {
         let table = pane.list.tableView
         pane.list.focus()
 
+        // The folder menu is short: the four New items sit in a New submenu, and shortcuts show.
+        if let item = pane.list.items.first(where: { $0.name == "New folder" }) {
+            let menu = ContextMenus.menu(for: [item], in: pane, window: w)
+            let top = menu.items.filter { !$0.isSeparatorItem }
+            let new = top.first { $0.title == "New" }?.submenu?.items.map(\.title) ?? []
+            check("the folder menu is short, with a New submenu", top.count <= 15
+                  && ["New Folder Inside", "New Text File Inside", "New Folder Next to It", "New Text File Next to It"].allSatisfy(new.contains))
+            check("the menu shows the key shortcuts", top.first { $0.title == "Copy" }?.keyEquivalent == "c"
+                  && top.first { $0.title == "Move to Trash" }?.keyEquivalent == "\u{8}"
+                  && top.first { $0.title == "Rename" }?.keyEquivalent == String(Character(UnicodeScalar(UInt32(NSF2FunctionKey))!)))
+        } else {
+            check("New folder is listed", false)
+        }
+
         pane.list.select([inner], scroll: false)
         key(NSCarriageReturnCharacter, to: table)
         await wait()
