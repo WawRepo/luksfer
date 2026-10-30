@@ -215,7 +215,8 @@ final class FileListViewController: NSViewController {
     // MARK: Rename in place
 
     /// Turns the name cell into a text field with the name (without extension) selected.
-    func beginRename(_ url: URL) {
+    /// `typed` puts that text in the field instead of the name (after a failed rename).
+    func beginRename(_ url: URL, typed: String? = nil) {
         guard let row = items.firstIndex(where: { $0.url.standardizedFileURL == url.standardizedFileURL }),
               let col = tableView.tableColumns.firstIndex(where: { $0.identifier == FileColumn.name.identifier }) else { return }
         tableView.selectRowIndexes([row], byExtendingSelection: false)
@@ -230,12 +231,23 @@ final class FileListViewController: NSViewController {
         field.isBordered = true
         field.delegate = self
         renaming = (item, field, false)
+        let name = typed ?? item.name
+        field.stringValue = name
         view.window?.makeFirstResponder(field)
-        let base = item.isFolder ? item.name : (item.name as NSString).deletingPathExtension
-        field.currentEditor()?.selectedRange = NSRange(location: 0, length: (base.isEmpty ? item.name : base).utf16.count)
+        let base = item.isFolder ? name : (name as NSString).deletingPathExtension
+        field.currentEditor()?.selectedRange = NSRange(location: 0, length: (base.isEmpty ? name : base).utf16.count)
     }
 
     var isRenaming: Bool { renaming != nil }
+    /// The text in the name field while renaming.
+    var renameText: String? { renaming?.field.stringValue }
+
+    /// Ends the rename and keeps the old name, like Esc.
+    func cancelRename() {
+        guard renaming != nil else { return }
+        renaming?.cancelled = true
+        view.window?.makeFirstResponder(tableView)
+    }
 
     private func endRename(commit: Bool) {
         guard let r = renaming else { return }

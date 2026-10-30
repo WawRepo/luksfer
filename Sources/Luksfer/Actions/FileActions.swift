@@ -120,13 +120,14 @@ final class FileActions {
 
     // MARK: Rename and new items
 
-    func rename(_ url: URL, to name: String, in window: BrowserWindowController) {
+    /// Renames `url`. On an error, `onFailure` runs after the user closes the error.
+    func rename(_ url: URL, to name: String, in window: BrowserWindowController, onFailure: (() -> Void)? = nil) {
         do {
             let change = try engine.rename(url, to: name)
             record(change)
             reloadPanes(in: window, showing: change.touchedFolders, select: change.createdItems)
         } catch {
-            window.showError(error)
+            window.showError(error, then: onFailure)
         }
     }
 

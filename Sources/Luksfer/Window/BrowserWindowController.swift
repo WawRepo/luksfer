@@ -269,12 +269,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return activePane.folder
     }
 
-    func showError(_ error: Error) {
-        guard let window else { return }
+    /// Shows the error as a sheet; `then` runs when the user closes it.
+    func showError(_ error: Error, then: (() -> Void)? = nil) {
+        guard let window else { then?(); return }
         if ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] != nil {
             FileHandle.standardError.write(Data("selftest: error shown: \(error.localizedDescription)\n".utf8))
         }
-        NSAlert(error: error).beginSheetModal(for: window)
+        NSAlert(error: error).beginSheetModal(for: window) { _ in then?() }
     }
 
     // MARK: State
@@ -366,7 +367,10 @@ extension BrowserWindowController: PaneDelegate {
     }
 
     func pane(_ pane: PaneViewController, rename item: FileItem, to name: String) {
-        FileActions.shared.rename(item.url, to: name, in: self)
+        // A failed rename opens the name again with what the user typed.
+        FileActions.shared.rename(item.url, to: name, in: self) { [weak pane] in
+            pane?.list.beginRename(item.url, typed: name)
+        }
     }
 
     func pane(_ pane: PaneViewController, drop urls: [URL], into folder: URL, operation: DropOperation) -> Bool {

@@ -344,6 +344,19 @@ enum SelfTest {
         await settle()
         check("redo rename", names(folder).contains("notes.md"))
 
+        // A rename to a name that is taken shows the error, then opens the name again as typed.
+        if let notes = list.items.first(where: { $0.name == "notes.md" }) {
+            w.pane(w.activePane, rename: notes, to: "New text file.txt")
+            check("a failed rename shows the error", await answer("OK", on: w.window))
+            await wait()
+            check("a failed rename keeps the typed name", list.isRenaming && list.renameText == "New text file.txt")
+            list.cancelRename()
+            await wait()
+            check("Esc after a failed rename keeps the old name", !list.isRenaming && names(folder).contains("notes.md"))
+        } else {
+            check("notes.md is listed", false)
+        }
+
         list.select([folder.appendingPathComponent("notes.md"), folder.appendingPathComponent("New folder")], scroll: false)
         w.moveToTrash(nil)
         await settle()
