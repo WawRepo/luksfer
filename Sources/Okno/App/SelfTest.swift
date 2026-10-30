@@ -262,6 +262,10 @@ enum SelfTest {
         check("“term” in the path bar opens the terminal", w.terminalOpen)
         check("a terminal app to open is found", TerminalAppLauncher.applicationURL(for: .terminal) != nil)
         w.closeTerminal()
+        // Leave two panes open for the OKNO_SELFTEST=restore run.
+        w.setTwoPanes(true, focus: false)
+        w.panes[1].navigate(to: inner)
+        await wait()
     }
 
     /// ⌘N opens a second window.
