@@ -139,17 +139,25 @@ final class FileActions {
         }
     }
 
-    /// Makes a new folder or file in `folder`, then opens its name for typing (Esc keeps it).
+    /// Makes a new folder or file in `parent`, then opens its name for typing (Esc keeps it).
+    /// A pane that shows `parent` gets the name field. Else the active pane opens `parent` first:
+    /// "New Folder Inside" would make the item out of sight.
     func create(folder: Bool, named name: String, in parent: URL, window: BrowserWindowController) {
         do {
             let change = folder ? try engine.createFolder(in: parent, named: name) : try engine.createFile(in: parent, named: name)
             record(change)
             guard let item = change.createdItems.first else { return }
-            let pane = window.activePane.folder.standardizedFileURL == parent.standardizedFileURL ? window.activePane : nil
+            let target = parent.standardizedFileURL
+            let showing = window.panes.filter { !$0.view.isHidden && $0.folder.standardizedFileURL == target }
+            let pane = showing.first { $0 === window.activePane } ?? showing.first
+            for other in showing where other !== pane { other.list.reload(select: [item]) }
             if let pane {
+                window.paneDidBecomeActive(pane)
                 pane.list.reload(select: [item]) { pane.list.beginRename(item) }
             } else {
-                reloadPanes(in: window, showing: [parent], select: [item])
+                let pane = window.activePane
+                pane.navigate(to: parent, select: [item])
+                pane.list.whenLoaded { pane.list.beginRename(item) }
             }
         } catch {
             window.showError(error)

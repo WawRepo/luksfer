@@ -175,6 +175,9 @@ final class FileListViewController: NSViewController {
         }
     }
 
+    /// Runs `then` once the listing that loads now has finished.
+    func whenLoaded(_ then: @escaping () -> Void) { onLoaded.append(then) }
+
     /// Lists the folder again, keeping the selection.
     func reload(select: [URL]? = nil, then: (() -> Void)? = nil) {
         guard let folder else { return }

@@ -357,6 +357,21 @@ enum SelfTest {
         await wait()
         check("new text file exists", names(folder).contains("New text file.txt"))
 
+        // "New Folder Inside" opens that folder and starts the name there.
+        let newFolder = folder.appendingPathComponent("New folder")
+        let inside = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        inside.representedObject = newFolder
+        w.newFolder(inside)
+        _ = await waitFor(5) { list.isRenaming }
+        check("New Folder Inside opens the folder and starts the name",
+              w.activePane.folder.standardizedFileURL == newFolder.standardizedFileURL && list.isRenaming && names(newFolder) == ["New folder"])
+        list.cancelRename()
+        undo.undo()
+        await settle()
+        w.activePane.goBack()
+        await wait()
+        check("undo New Folder Inside", names(newFolder).isEmpty && w.activePane.folder.standardizedFileURL == folder.standardizedFileURL)
+
         list.select([folder.appendingPathComponent("New text file.txt")], scroll: false)
         w.copy(nil)
         check("Copy says what it did", w.statusBar.message == "Copied “New text file.txt”. Paste with ⌘V.")
