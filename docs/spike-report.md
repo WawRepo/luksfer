@@ -1,15 +1,15 @@
 # Spike report (milestone 1)
 
-Oct 30, 2026 · Mac: Apple Silicon, macOS 26, Xcode 27, Swift 6.4
+October 2026 · An Apple Silicon Mac with macOS 26, Xcode 27 and Swift 6.4
 
 The spike code is in `Spike/main.swift`. Run it with
-`scripts/build.sh -c release --product LuksferSpike`, then
-`~/Library/Caches/luksfer-dev/build/luksfer/release/LuksferSpike <check>`. Every write goes to
+`scripts/build.sh -c release --product LuksferSpike`, then run `LuksferSpike <check>` from the
+`release/` folder in `~/Library/Caches/luksfer-dev/build/`. Every write goes to
 `~/Library/Caches/luksfer-dev/sandbox/`.
 
 ## Result
 
-Every risky part works on this Mac. Luksfer is built with **Swift and AppKit**, with **SwiftTerm**
+Every risky part works. Luksfer is built with **Swift and AppKit**, with **SwiftTerm**
 for the terminal. One finding changes the design: the app lists folders with `readdir` + `fstatat`,
 not with Foundation's URL resource keys, because the cloud-status keys are 33 times slower.
 
@@ -30,7 +30,7 @@ Finder order), fill a view-based `NSTableView` with 4 columns, and draw the firs
 |---|---|
 | First open | 142.7 ms |
 | Median of the next 5 | 113.7 ms (list 24 ms, sort 51 ms, table and first draw 38 ms) |
-| Target (PRD §7) | under 300 ms |
+| Target (PRD §6) | under 300 ms |
 
 - Sorting with `NSString.localizedStandardCompare` is 28 ms; the same call on Swift `String` is
   47 ms because of bridging. The app keeps names as `NSString` for sorting.
@@ -43,23 +43,21 @@ Finder order), fill a view-based `NSTableView` with 4 columns, and draw the firs
 
 ## 2. Google Drive: listing without downloads
 
-Read only. The folder and its direct subfolders were listed with the keys the app needs, every type
-icon was drawn, and then each "only in the cloud" file was checked again.
-
-| Folder | Items | Only in the cloud | After listing and icons |
-|---|---|---|---|
-| Google Drive in `~/Library/CloudStorage/` (File Provider) | a few hundred | most | all still only in the cloud |
-| A local synced folder (not File Provider) | a few hundred | 0 | — |
+Read only. A Google Drive folder in `~/Library/CloudStorage/` (File Provider) with a few hundred
+items, most of them only in the cloud, was listed with its direct subfolders, using the keys the app
+needs. Every type icon was drawn, and then each "only in the cloud" file was checked again: every one
+was still only in the cloud. A synced folder that is not a File Provider folder was listed the same
+way as a control.
 
 - **No download started.**
 - "Only in the cloud" = the `SF_DATALESS` flag in `st_flags` (from `fstatat`). It matched the
-  File Provider status exactly (every file it marked was "not downloaded"). It costs nothing extra, so the
-  cloud-status keys are never needed for the list.
+  File Provider status exactly (every file it marked was "not downloaded"). It costs nothing extra,
+  so the cloud-status keys are never needed for the list.
 - Rules for the app: icons come from the file type (`NSWorkspace.icon(for: UTType)`), never from the
   file (`icon(forFile:)` can read it). No thumbnails in cloud folders. Folder size stays empty.
   Copying a cloud-only file downloads it; that is the user's own action.
-- Listing a File Provider folder with the cloud keys took about 1 s for a few hundred items. The fast listing
-  avoids that cost. Slow folders still load in the background.
+- Listing the File Provider folder with the cloud keys took about 1 s for a few hundred items. The
+  fast listing avoids that cost. Slow folders still load in the background.
 
 ## 3. Terminal: SwiftTerm
 
@@ -71,8 +69,8 @@ icon was drawn, and then each "only in the cloud" file was checked again.
   user's files first, then add two hooks:
   - OSC 7 (an escape code that reports the shell's folder) after every command.
   - A private OSC 6973 mark: `prompt` when the shell waits, `exec` when a command starts.
-- Timeline: first prompt after about 1.5 s (the user's own startup files); `cd` reported the new folder 41 ms after
-  it was sent.
+- Timeline: the first prompt comes when the user's own startup files finish (about 1.5 s here);
+  `cd` reported the new folder 41 ms after it was sent.
 - Found: the `precmd` hook runs *before* the prompt is drawn, so text sent there shows twice. The
   app sends the `prompt` mark from the line editor's `line-init` hook instead, and sends `cd` only
   when nothing has been typed since.
@@ -84,7 +82,7 @@ icon was drawn, and then each "only in the cloud" file was checked again.
   from a private pasteboard: 2 of 2 paths, and the old `NSFilenamesPboardType` that older apps
   read also works. This is the format Finder writes and reads.
 - A cut is a normal file copy plus a private marker type (`io.github.wawrepo.luksfer.cut`). Luksfer moves on paste when
-  the marker is there. Finder ignores the marker, so a cut pasted in Finder becomes a copy (PRD §6.6).
+  the marker is there. Finder ignores the marker, so a cut pasted in Finder becomes a copy (PRD §5.6).
 - Drag and drop uses the same pasteboard data. A real drag between Luksfer and Finder can only be done
   by hand; it is checked in milestone 4.
 
@@ -95,7 +93,7 @@ icon was drawn, and then each "only in the cloud" file was checked again.
   `selectFile(_:inFileViewerRootedAtPath:)`) send the request to that app instead of Finder.
 - Apps that tell Finder directly (AppleScript, `open -R` on some versions) still go to Finder. So
   "Show in Finder" reaches Luksfer only from apps that ask macOS for the file viewer, as the PRD expects.
-- Not set on this Mac (`NSFileViewer` does not exist). The spike did not change it: it is a global
+- `NSFileViewer` was not set on the test Mac. The spike did not change it: it is a global
   setting, and changing it is the user's choice in milestone 6. That milestone adds an opt-in
   switch and tests the exact request Luksfer receives.
 
@@ -109,5 +107,5 @@ icon was drawn, and then each "only in the cloud" file was checked again.
 | Terminal | SwiftTerm `LocalProcessTerminalView`; zsh integration through `ZDOTDIR` (OSC 7 + OSC 6973) |
 | Project | Swift Package (no Xcode project): `LuksferCore` (logic, unit tests), `Luksfer` (app), `LuksferSpike` |
 | App bundle | `scripts/build-app.sh` builds `Luksfer.app` in `~/Library/Caches/luksfer-dev/dist/` |
-| Builds | `scripts/build.sh` (through `scripts/heavy.sh`: one heavy job at a time, `-j 6`), output in `~/Library/Caches/luksfer-dev/build/` |
+| Builds | `scripts/build.sh` (one build at a time, through `scripts/heavy.sh`), output in `~/Library/Caches/luksfer-dev/build/` |
 | Settings | JSON in `~/Library/Application Support/Luksfer/` |
