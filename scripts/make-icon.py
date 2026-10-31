@@ -19,8 +19,11 @@ Writes, inside the repo:
 
 Temporary files (the .iconset, the preview, the actool output) go to ~/Library/Caches/luksfer-dev/icon/.
 
-The icon square is cut from the source, scaled to the 824 x 824 body of the macOS icon grid and
-masked to Apple's continuous-corner shape, with the usual soft drop shadow in the margin.
+The icon art is a square cut from the source around the glass block, so the block fills about 80% of
+the icon (in the source it fills about 66%, which looks small next to other icons). Its dark parts are
+lightened, most at the top, so the tile's edge shows in a dark Dock. The art is scaled to the 824 x 824
+body of the macOS icon grid and masked to Apple's continuous-corner shape, with the usual soft drop
+shadow in the margin.
 """
 from __future__ import annotations
 
@@ -32,7 +35,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 REPO = Path(__file__).resolve().parent.parent
 RESOURCES = REPO / "Resources"
@@ -40,11 +43,13 @@ SOURCE = REPO / "docs" / "brand" / "luksfer-branding.png"
 LOGO = REPO / "docs" / "brand" / "logo.png"
 SCRATCH = Path.home() / "Library" / "Caches" / "luksfer-dev" / "icon"
 
-# Boxes in the source image (left, top, right, bottom), measured: the icon's rounded square, and
-# the logo with some of the dark background around it. INSET drops the dark shadow pixels on the
-# icon's edge, so they do not show as a line once scaled up.
-ICON_BOX = (172, 281, 579, 686)
-INSET = 2
+# Measured in the source image: the centre and size of the glass block (with its glow) inside the
+# icon's rounded square, and the logo box (left, top, right, bottom) with some dark background.
+BLOCK_CENTER = (374.5, 486.0)
+BLOCK_SIZE = 269.0
+BLOCK_FILL = 0.80  # how much of the icon the block fills
+LIFT = 0.5  # how far the darkest pixels move toward LIFT_COLOR at the top (half that at the bottom)
+LIFT_COLOR = (96, 116, 148)
 LOGO_BOX = (680, 345, 1450, 625)
 LOGO_RADIUS = 28
 
@@ -120,10 +125,16 @@ def source() -> Image.Image:
 
 
 def icon_art(pixels: int) -> Image.Image:
-    """The icon square from the source, scaled to `pixels` x `pixels`, without a mask."""
-    x0, y0, x1, y1 = ICON_BOX
-    art = source().crop((x0 + INSET, y0 + INSET, x1 - INSET, y1 - INSET))
-    return art.resize((pixels, pixels), Image.LANCZOS)
+    """The square around the block, scaled to `pixels` x `pixels` and lightened, without a mask."""
+    cx, cy = BLOCK_CENTER
+    half = BLOCK_SIZE / BLOCK_FILL / 2
+    art = source().crop((round(cx - half), round(cy - half), round(cx + half), round(cy + half)))
+    art = art.resize((pixels, pixels), Image.LANCZOS)
+    # A soft top light: the darker the pixel and the higher up, the more it moves toward LIFT_COLOR.
+    dark = art.convert("L").point(lambda v: round(255 * max(0.0, 1 - v / 110) ** 1.5))
+    ramp = Image.linear_gradient("L").resize((pixels, pixels)).point(lambda v: round(255 - v * 0.55))
+    amount = ImageChops.multiply(dark, ramp).point(lambda v: round(v * LIFT))
+    return Image.composite(Image.new("RGB", art.size, LIFT_COLOR), art, amount)
 
 
 def draw(pixels: int) -> Image.Image:
