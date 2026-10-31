@@ -20,10 +20,10 @@ Writes, inside the repo:
 Temporary files (the .iconset, the preview, the actool output) go to ~/Library/Caches/luksfer-dev/icon/.
 
 The icon art is a square cut from the source around the glass block, so the block fills about 80% of
-the icon (in the source it fills about 66%, which looks small next to other icons). Its dark parts are
-lightened, most at the top, so the tile's edge shows in a dark Dock. The art is scaled to the 824 x 824
-body of the macOS icon grid and masked to Apple's continuous-corner shape, with the usual soft drop
-shadow in the margin.
+the icon (in the source it fills about 66%, which looks small next to other icons). The glass's light
+is then put on a bright blue tile instead of the source's dark one: a dark tile looks smaller than
+the bright icons next to it in the Dock. The art is scaled to the 824 x 824 body of the macOS icon
+grid and masked to Apple's continuous-corner shape, with the usual soft drop shadow in the margin.
 """
 from __future__ import annotations
 
@@ -48,8 +48,10 @@ SCRATCH = Path.home() / "Library" / "Caches" / "luksfer-dev" / "icon"
 BLOCK_CENTER = (374.5, 486.0)
 BLOCK_SIZE = 269.0
 BLOCK_FILL = 0.80  # how much of the icon the block fills
-LIFT = 0.5  # how far the darkest pixels move toward LIFT_COLOR at the top (half that at the bottom)
-LIFT_COLOR = (96, 116, 148)
+SOURCE_TILE = (26, 33, 46)  # the source's dark tile colour, taken away to keep the glass's light
+GLASS_GAIN = 1.15
+TILE_TOP = (70, 160, 255)
+TILE_BOTTOM = (16, 82, 210)
 LOGO_BOX = (680, 345, 1450, 625)
 LOGO_RADIUS = 28
 
@@ -125,16 +127,17 @@ def source() -> Image.Image:
 
 
 def icon_art(pixels: int) -> Image.Image:
-    """The square around the block, scaled to `pixels` x `pixels` and lightened, without a mask."""
+    """The square around the block on the blue tile, `pixels` x `pixels`, without a mask."""
     cx, cy = BLOCK_CENTER
     half = BLOCK_SIZE / BLOCK_FILL / 2
     art = source().crop((round(cx - half), round(cy - half), round(cx + half), round(cy + half)))
     art = art.resize((pixels, pixels), Image.LANCZOS)
-    # A soft top light: the darker the pixel and the higher up, the more it moves toward LIFT_COLOR.
-    dark = art.convert("L").point(lambda v: round(255 * max(0.0, 1 - v / 110) ** 1.5))
-    ramp = Image.linear_gradient("L").resize((pixels, pixels)).point(lambda v: round(255 - v * 0.55))
-    amount = ImageChops.multiply(dark, ramp).point(lambda v: round(v * LIFT))
-    return Image.composite(Image.new("RGB", art.size, LIFT_COLOR), art, amount)
+    # The glass is light on a dark tile: keep only that light and screen it onto the blue tile.
+    light = ImageChops.subtract(art, Image.new("RGB", art.size, SOURCE_TILE))
+    light = light.point(lambda v: min(255, round(v * GLASS_GAIN)))
+    ramp = Image.linear_gradient("L").resize((pixels, pixels))
+    tile = Image.composite(Image.new("RGB", art.size, TILE_BOTTOM), Image.new("RGB", art.size, TILE_TOP), ramp)
+    return ImageChops.screen(tile, light)
 
 
 def draw(pixels: int) -> Image.Image:
