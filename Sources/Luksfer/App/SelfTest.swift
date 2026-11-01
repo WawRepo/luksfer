@@ -454,6 +454,31 @@ enum SelfTest {
         await wait()
     }
 
+    /// A minimized window comes back when Luksfer comes to the front or is opened again.
+    private static func comeBack(window w: BrowserWindowController) async {
+        guard let window = w.window else { return }
+        func browserWindows() -> Int { NSApp.windows.filter { $0.windowController is BrowserWindowController }.count }
+        let before = browserWindows()
+        // True when the window really went to the Dock and then came back, with no extra window.
+        func minimizeThenComeBack(_ bringBack: () -> Void) async -> Bool {
+            window.miniaturize(nil)
+            guard await waitFor(5, { window.isMiniaturized }) else { return false }
+            bringBack()
+            return await waitFor(5) { !window.isMiniaturized && window.isVisible } && browserWindows() == before
+        }
+        check("a minimized window comes back when Luksfer comes to the front", await minimizeThenComeBack {
+            (NSApp.delegate as? AppDelegate)?.applicationDidBecomeActive(Notification(name: NSApplication.didBecomeActiveNotification))
+        })
+        check("a minimized window comes back when Luksfer is opened again", await minimizeThenComeBack {
+            // The same Apple event the Dock and `open -a` send to a running app.
+            let reopen = NSAppleEventDescriptor(eventClass: AEEventClass(kCoreEventClass), eventID: AEEventID(kAEReopenApplication),
+                                                targetDescriptor: .currentProcess(), returnID: AEReturnID(kAutoGenerateReturnID),
+                                                transactionID: AETransactionID(kAnyTransactionID))
+            _ = try? reopen.sendEvent(options: [.noReply], timeout: 2)
+        })
+        await wait()
+    }
+
     /// LUKSFER_SELFTEST=restore: the window from the last run comes back with two panes and its folders.
     private static func restore() async {
         await wait(1.5)
@@ -578,6 +603,7 @@ enum SelfTest {
         await navigation(in: folder, window: w)
         await drops(in: folder, window: w)
         await newWindow()
+        await comeBack(window: w)
         await terminal(in: folder, window: w)
         await networkDrives(window: w)
 

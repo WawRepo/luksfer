@@ -54,6 +54,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
+    /// Luksfer came to the front (a keyboard shortcut, ⌘Tab, the Dock) with no window on screen.
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // One turn later: a hidden app shows its windows again only after it became active.
+        DispatchQueue.main.async { [weak self] in self?.showWindowIfNoneOnScreen() }
+    }
+
+    /// The Dock icon was clicked or the app was opened again while it runs.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showWindowIfNoneOnScreen()
+        return false
+    }
+
+    /// Like Windows: bring the minimized windows back, or open a new window when there is none.
+    func showWindowIfNoneOnScreen() {
+        guard !terminating, !NSApp.isHidden,
+              !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) else { return }
+        let minimized = NSApp.windows.filter(\.isMiniaturized)
+        if !minimized.isEmpty {
+            minimized.forEach { $0.deminiaturize(nil) }
+        } else if controllers.isEmpty {
+            openWindow(state: nil)
+        }
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         terminating = true
         saveWindows()
