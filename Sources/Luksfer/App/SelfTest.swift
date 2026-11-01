@@ -454,6 +454,8 @@ enum SelfTest {
         await wait()
         let after = NSApp.windows.filter { $0.windowController is BrowserWindowController && $0.isVisible }
         check("⌘N opens a new window", after.count == before + 1)
+        check("the new window does not cover the other one exactly",
+              Set(after.map { NSStringFromPoint(NSPoint(x: $0.frame.minX, y: $0.frame.maxY)) }).count == after.count)
         after.last?.close()
         await wait()
     }
@@ -503,6 +505,20 @@ enum SelfTest {
         window.deminiaturize(nil)
         _ = await waitFor(5) { !window.isMiniaturized && window.isVisible }
         opened.forEach { $0.window?.close() }
+        window.makeKeyAndOrderFront(nil)
+        await wait()
+
+        // Pressed twice with the window on screen: each new window steps away from the front one.
+        func topLeft(_ win: NSWindow?) -> String { win.map { NSStringFromPoint(NSPoint(x: $0.frame.minX, y: $0.frame.maxY)) } ?? "" }
+        _ = try? open.sendEvent(options: [.noReply], timeout: 2)
+        await wait()
+        _ = try? open.sendEvent(options: [.noReply], timeout: 2)
+        await wait()
+        let twice = NSApp.windows.compactMap { $0.windowController as? BrowserWindowController }
+            .filter { $0 !== w && $0.window?.isVisible == true }
+        check("each shortcut window steps away from the window in front",
+              twice.count == 2 && Set([topLeft(window)] + twice.map { topLeft($0.window) }).count == 3)
+        twice.forEach { $0.window?.close() }
         window.makeKeyAndOrderFront(nil)
         await wait()
     }

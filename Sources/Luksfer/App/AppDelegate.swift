@@ -31,16 +31,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let c = BrowserWindowController(state: state, folder: folder)
         c.onClose = { [weak self] closed in self?.windowClosed(closed) }
         controllers.append(c)
+        if state == nil, let window = c.window { stepFromFrontWindow(window) }
         c.showWindow(nil)
         return c
     }
 
+    /// A new window sits 24 points down and right of the front window, so it never covers it exactly.
+    /// It goes back to the top left of the screen when it would leave the screen.
+    private func stepFromFrontWindow(_ window: NSWindow) {
+        guard let front = NSApp.orderedWindows.first(where: {
+            $0 !== window && $0.isVisible && $0.windowController is BrowserWindowController
+        }) else { return }
+        var topLeft = NSPoint(x: front.frame.minX + 24, y: front.frame.maxY - 24)
+        if let visible = front.screen?.visibleFrame,
+           topLeft.x + window.frame.width > visible.maxX || topLeft.y - window.frame.height < visible.minY {
+            topLeft = NSPoint(x: visible.minX, y: visible.maxY)
+        }
+        window.setFrameTopLeftPoint(topLeft)
+    }
+
     @objc func newWindow(_ sender: Any?) {
         let current = (NSApp.keyWindow?.windowController as? BrowserWindowController)?.activePane.folder
-        let c = openWindow(state: nil, folder: current)
-        if let frame = NSApp.keyWindow?.frame, c.window !== NSApp.keyWindow {
-            c.window?.setFrameTopLeftPoint(NSPoint(x: frame.minX + 24, y: frame.maxY - 24))
-        }
+        openWindow(state: nil, folder: current)
     }
 
     private func windowClosed(_ c: BrowserWindowController) {
