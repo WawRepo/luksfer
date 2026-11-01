@@ -6,16 +6,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
     private var terminating = false
 
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    // Before a launch's open request (`application(_:open:)`), which lists a folder.
+    func applicationWillFinishLaunching(_ notification: Notification) {
         DatalessPolicy.protectProcess()
         NSApp.mainMenu = MainMenu.build()
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
         let states = AppServices.shared.settings.windows
         if let open = DevHooks.openFolder {
             openWindow(state: nil, folder: open)
-        } else if states.isEmpty {
-            openWindow(state: nil)
-        } else {
-            states.forEach { openWindow(state: $0) }
+        } else if controllers.isEmpty {
+            // Not launched to open a folder (that window is open already): bring back the saved windows.
+            if states.isEmpty { openWindow(state: nil) } else { states.forEach { openWindow(state: $0) } }
         }
         NSApp.activate()
         DevHooks.scheduleSnapshot()
@@ -56,8 +59,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Luksfer came to the front (a keyboard shortcut, ⌘Tab, the Dock) with no window on screen.
     func applicationDidBecomeActive(_ notification: Notification) {
-        // One turn later: a hidden app shows its windows again only after it became active.
-        DispatchQueue.main.async { [weak self] in self?.showWindowIfNoneOnScreen() }
+        // A moment later: a hidden app shows its windows again only after it became active, and a
+        // shortcut that opens a folder (`open -a Luksfer ~/Downloads`) sends its request just after.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.showWindowIfNoneOnScreen() }
     }
 
     /// The Dock icon was clicked or the app was opened again while it runs.
@@ -84,7 +88,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateNow
     }
 
-    /// Folders dropped on the Dock icon or opened with Luksfer open in a new window.
+    /// Folders dropped on the Dock icon or opened with Luksfer (a shortcut that runs
+    /// `open -a Luksfer ~/Downloads`) open in a new single-pane window.
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
             var isDir: ObjCBool = false

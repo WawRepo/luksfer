@@ -12,6 +12,10 @@ enum SelfTest {
             Task { await restore() }
             return
         }
+        if ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] == "opened" {
+            Task { await opened() }
+            return
+        }
         guard ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] == "1",
               ProcessInfo.processInfo.environment["LUKSFER_TRASH_DIR"] != nil,
               let folder = DevHooks.openFolder else { return }
@@ -454,8 +458,9 @@ enum SelfTest {
         await wait()
     }
 
-    /// A minimized window comes back when Luksfer comes to the front or is opened again.
-    private static func comeBack(window w: BrowserWindowController) async {
+    /// A minimized window comes back when Luksfer comes to the front or is opened again, but a
+    /// shortcut that opens a folder gets a new window.
+    private static func comeBack(in folder: URL, window w: BrowserWindowController) async {
         guard let window = w.window else { return }
         func browserWindows() -> Int { NSApp.windows.filter { $0.windowController is BrowserWindowController }.count }
         let before = browserWindows()
@@ -476,7 +481,43 @@ enum SelfTest {
                                                 transactionID: AETransactionID(kAnyTransactionID))
             _ = try? reopen.sendEvent(options: [.noReply], timeout: 2)
         })
+
+        // The shortcut: Luksfer becomes active, then gets the same open request as `open -a Luksfer <folder>`.
+        let target = folder.appendingPathComponent("New folder")
+        window.miniaturize(nil)
+        let down = await waitFor(5) { window.isMiniaturized }
+        (NSApp.delegate as? AppDelegate)?.applicationDidBecomeActive(Notification(name: NSApplication.didBecomeActiveNotification))
+        let open = NSAppleEventDescriptor(eventClass: AEEventClass(kCoreEventClass), eventID: AEEventID(kAEOpenDocuments),
+                                          targetDescriptor: .currentProcess(), returnID: AEReturnID(kAutoGenerateReturnID),
+                                          transactionID: AETransactionID(kAnyTransactionID))
+        let files = NSAppleEventDescriptor.list()
+        files.insert(NSAppleEventDescriptor(fileURL: target), at: 0)
+        open.setParam(files, forKeyword: AEKeyword(keyDirectObject))
+        _ = try? open.sendEvent(options: [.noReply], timeout: 2)
+        await wait(1.0)
+        let opened = NSApp.windows.compactMap { $0.windowController as? BrowserWindowController }
+            .filter { $0 !== w && $0.window?.isVisible == true }
+        check("the shortcut opens a new single-pane window at its folder and leaves the minimized one",
+              down && window.isMiniaturized && opened.count == 1 && !opened[0].twoPanes
+              && opened[0].activePane.folder.standardizedFileURL.path == target.standardizedFileURL.path)
+        window.deminiaturize(nil)
+        _ = await waitFor(5) { !window.isMiniaturized && window.isVisible }
+        opened.forEach { $0.window?.close() }
+        window.makeKeyAndOrderFront(nil)
         await wait()
+    }
+
+    /// LUKSFER_SELFTEST=opened, launched with `open -n … <sandbox>/opened` and the settings that the
+    /// restore run left (one window, two panes): only the asked folder opens, in one single-pane window.
+    private static func opened() async {
+        await wait(1.5)
+        let windows = NSApp.windows.compactMap { $0.windowController as? BrowserWindowController }
+        check("a launch to open a folder opens only that window", windows.count == 1)
+        if let w = windows.first {
+            check("that window has one pane", !w.twoPanes)
+            check("that window shows the folder", w.activePane.folder.lastPathComponent == "opened")
+        }
+        finish()
     }
 
     /// LUKSFER_SELFTEST=restore: the window from the last run comes back with two panes and its folders.
@@ -603,7 +644,7 @@ enum SelfTest {
         await navigation(in: folder, window: w)
         await drops(in: folder, window: w)
         await newWindow()
-        await comeBack(window: w)
+        await comeBack(in: folder, window: w)
         await terminal(in: folder, window: w)
         await networkDrives(window: w)
 

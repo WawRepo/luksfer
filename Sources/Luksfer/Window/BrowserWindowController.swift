@@ -35,10 +35,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.delegate = self
 
+        // A window without a saved state starts in Downloads (the home folder when there is none).
         let home = FileManager.default.homeDirectoryForCurrentUser
+        let downloads = home.appendingPathComponent("Downloads", isDirectory: true)
         let paneStates = state?.panes ?? []
         for i in 0..<2 {
-            var start = i < paneStates.count ? URL(fileURLWithPath: paneStates[i].path, isDirectory: true) : home
+            var start = i < paneStates.count ? URL(fileURLWithPath: paneStates[i].path, isDirectory: true) : downloads
             if i == 0, let folder { start = folder }
             if !FileManager.default.fileExists(atPath: start.path) { start = home }
             let pane = PaneViewController(folder: start, sort: i < paneStates.count ? paneStates[i].sort : FileSortOrder())

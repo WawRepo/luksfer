@@ -62,6 +62,14 @@ export LUKSFER_TRASH_DIR="$root/trash" LUKSFER_SETTINGS_DIR="$root/settings" \
        LUKSFER_KEYCHAIN="$root/keychain/test.keychain-db" LUKSFER_MOUNT_DIR="$root/mnt"
 LUKSFER_SELFTEST=1 LUKSFER_OPEN="$root/folder" "$app" 2>&1 | grep selftest
 LUKSFER_SELFTEST=restore "$app" 2>&1 | grep selftest   # checks that the window comes back
+# A launch to open a folder (the Win+E shortcut) opens only that window. `open` does not pass the
+# shell's environment, so each variable goes in with --env:
+mkdir -p "$root/opened"
+open -n -W --env LUKSFER_SELFTEST=opened --env LUKSFER_TRASH_DIR="$root/trash" \
+     --env LUKSFER_SETTINGS_DIR="$root/settings" --env LUKSFER_KEYCHAIN="$root/keychain/test.keychain-db" \
+     --env LUKSFER_MOUNT_DIR="$root/mnt" --stderr "$root/opened.log" \
+     -a ~/Library/Caches/luksfer-dev/dist/Luksfer.app "$root/opened"
+grep selftest "$root/opened.log"
 ```
 
 - `LUKSFER_OPEN`: an empty folder to work in.

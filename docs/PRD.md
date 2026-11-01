@@ -67,6 +67,11 @@ inside the window. It is the app you open for everyday file work instead of Find
 - Back and forward: the toolbar buttons, ⌘[ and ⌘], Backspace, and the back and forward buttons of a
   mouse. The mouse buttons work on the pane under the pointer, like Explorer.
 - More windows with ⌘N. Luksfer remembers its windows, panes and folders between launches.
+- A new window without a saved state is one pane in Downloads.
+- A keyboard shortcut opens a new window from anywhere, like Win+E: the shortcut asks Luksfer to
+  open a folder (`open -a /Applications/Luksfer.app ~/Downloads`), and every request gets its own
+  single-pane window. When Luksfer comes to the front with no window on screen (⌘Tab, the Dock),
+  its minimized windows come back.
 
 ### 5.2 Details view
 
