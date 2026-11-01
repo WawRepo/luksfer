@@ -61,6 +61,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var collapsedSidebarSections: [String] = []
     /// Network drives in the sidebar. Their passwords are in the Keychain, never here.
     public var networkDrives: [NetworkDrive] = []
+    /// ⌥⌘Space opens a new window from any app. While it is on, Luksfer keeps running without a window.
+    public var newWindowHotKey = true
 
     public init() {}
 
@@ -86,6 +88,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         windows = try c.decodeIfPresent([WindowState].self, forKey: .windows) ?? []
         collapsedSidebarSections = try c.decodeIfPresent([String].self, forKey: .collapsedSidebarSections) ?? []
         networkDrives = try c.decodeIfPresent([NetworkDrive].self, forKey: .networkDrives) ?? []
+        newWindowHotKey = try c.decodeIfPresent(Bool.self, forKey: .newWindowHotKey) ?? true
     }
 }
 

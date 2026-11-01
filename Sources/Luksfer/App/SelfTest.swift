@@ -24,6 +24,9 @@ enum SelfTest {
 
     private static var failures = 0
 
+    /// Any self-test mode. The self-test never takes ⌥⌘Space from the user.
+    nonisolated static var isRunning: Bool { ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] != nil }
+
     private static func check(_ name: String, _ ok: Bool) {
         if !ok { failures += 1 }
         FileHandle.standardError.write(Data("selftest: \(ok ? "PASS" : "FAIL") \(name)\n".utf8))
@@ -523,6 +526,30 @@ enum SelfTest {
         await wait()
     }
 
+    /// What ⌥⌘Space does (the self-test calls it, it never takes the real key), and what the key
+    /// needs: Luksfer keeps running after the last window closes while the key is on.
+    private static func hotKey(window w: BrowserWindowController) async {
+        guard let app = NSApp.delegate as? AppDelegate else { return }
+        app.newWindowFromHotKey()
+        await wait()
+        let opened = NSApp.windows.compactMap { $0.windowController as? BrowserWindowController }
+            .filter { $0 !== w && $0.window?.isVisible == true }
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let downloads = home.appendingPathComponent("Downloads", isDirectory: true)
+        let expected = FileManager.default.fileExists(atPath: downloads.path) ? downloads : home
+        check("⌥⌘Space opens a new single-pane window in Downloads", opened.count == 1 && !opened[0].twoPanes
+              && opened[0].activePane.folder.standardizedFileURL.path == expected.standardizedFileURL.path)
+        opened.forEach { $0.window?.close() }
+        w.window?.makeKeyAndOrderFront(nil)
+        await wait()
+        check("Luksfer keeps running after the last window closes while ⌥⌘Space is on",
+              !app.applicationShouldTerminateAfterLastWindowClosed(NSApp))
+        AppServices.shared.update { $0.newWindowHotKey = false }
+        check("with ⌥⌘Space off, Luksfer quits after the last window closes",
+              app.applicationShouldTerminateAfterLastWindowClosed(NSApp))
+        AppServices.shared.update { $0.newWindowHotKey = true }
+    }
+
     /// LUKSFER_SELFTEST=opened, launched with `open -n … <sandbox>/opened` and the settings that the
     /// restore run left (one window, two panes): only the asked folder opens, in one single-pane window.
     private static func opened() async {
@@ -661,6 +688,7 @@ enum SelfTest {
         await drops(in: folder, window: w)
         await newWindow()
         await comeBack(in: folder, window: w)
+        await hotKey(window: w)
         await terminal(in: folder, window: w)
         await networkDrives(window: w)
 

@@ -19,20 +19,19 @@ for "window"), so older commits use that name.
 - A terminal panel at the bottom of the window that follows the folder you are in, and
   "Open in Terminal App" for Terminal, iTerm2, Ghostty or Warp.
 - Network drives (SMB), like Explorer's "Map network drive". Passwords stay in the macOS Keychain.
-- A new window from anywhere, like Win+E (see below).
+- A new window from any app with ⌥⌘Space, like Win+E (see below).
 
-## A keyboard shortcut for a new window
+## A new window from any app
 
-macOS uses ⌥⌘Space for the Finder search window. To give it to Luksfer:
+Press ⌥⌘Space in any app, Luksfer included, to open a new single-pane window in Downloads, like
+Win+E on Windows.
 
-1. System Settings > Keyboard > Keyboard Shortcuts… > Spotlight: turn off "Show Finder search window".
-2. In the Shortcuts app, make a shortcut with one "Run Shell Script" action:
-   `open -a /Applications/Luksfer.app ~/Downloads`
-   (If Shortcuts asks, turn on Shortcuts > Settings > Advanced > Allow Running Scripts.)
-3. In the shortcut's details, click "Add Keyboard Shortcut" and press ⌥⌘Space.
-
-Every press opens a new single-pane window in Downloads. Put another folder in the command to start
-there.
+- Luksfer has to run for the key to work. It keeps running when you close its last window. To
+  start it when you log in, turn on Settings > "Open Luksfer at login".
+- macOS uses ⌥⌘Space for the Finder search window. Turn that off first: System Settings > Keyboard >
+  Keyboard Shortcuts… > Spotlight > "Show Finder search window".
+- To turn the key off, use Settings > "⌥⌘Space opens a new window in Downloads". Luksfer then quits
+  when you close its last window.
 
 ## Install
 

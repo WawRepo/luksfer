@@ -68,10 +68,13 @@ inside the window. It is the app you open for everyday file work instead of Find
   mouse. The mouse buttons work on the pane under the pointer, like Explorer.
 - More windows with ⌘N. Luksfer remembers its windows, panes and folders between launches.
 - A new window without a saved state is one pane in Downloads.
-- A keyboard shortcut opens a new window from anywhere, like Win+E: the shortcut asks Luksfer to
-  open a folder (`open -a /Applications/Luksfer.app ~/Downloads`), and every request gets its own
-  single-pane window. When Luksfer comes to the front with no window on screen (⌘Tab, the Dock),
-  its minimized windows come back.
+- ⌥⌘Space opens a new single-pane window in Downloads from any app, Luksfer included, like Win+E.
+  It is a global hot key that needs no permission. While it is on (Settings, on by default),
+  Luksfer keeps running after its last window closes. Settings can also open Luksfer at login; a
+  launch at login opens no window. Each new window sits a little down and right of the front one.
+- A request to open a folder (`open -a Luksfer <folder>`, a folder dropped on the Dock icon) gets
+  its own single-pane window. When Luksfer comes to the front with no window on screen (⌘Tab, the
+  Dock), its minimized windows come back.
 
 ### 5.2 Details view
 

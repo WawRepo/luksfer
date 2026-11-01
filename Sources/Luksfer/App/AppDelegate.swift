@@ -5,22 +5,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var controllers: [BrowserWindowController] = []
     private var settingsWindow: NSWindow?
     private var terminating = false
+    private lazy var hotKey = GlobalHotKey { [weak self] in self?.newWindowFromHotKey() }
+    /// Started at login: no window until the user asks for one (⌥⌘Space, the Dock).
+    private var quietLaunch = false
 
     // Before a launch's open request (`application(_:open:)`), which lists a folder.
     func applicationWillFinishLaunching(_ notification: Notification) {
         DatalessPolicy.protectProcess()
         NSApp.mainMenu = MainMenu.build()
+        quietLaunch = Self.launchedAtLogin()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let states = AppServices.shared.settings.windows
+        quietLaunch = quietLaunch || Self.launchedAtLogin()
         if let open = DevHooks.openFolder {
             openWindow(state: nil, folder: open)
-        } else if controllers.isEmpty {
+        } else if controllers.isEmpty && !quietLaunch {
             // Not launched to open a folder (that window is open already): bring back the saved windows.
             if states.isEmpty { openWindow(state: nil) } else { states.forEach { openWindow(state: $0) } }
         }
-        NSApp.activate()
+        updateHotKey()
+        if !quietLaunch { NSApp.activate() }
         DevHooks.scheduleSnapshot()
         DevHooks.scheduleBench()
         SelfTest.scheduleIfAsked()
@@ -50,6 +56,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.setFrameTopLeftPoint(topLeft)
     }
 
+    private static func launchedAtLogin() -> Bool {
+        guard let event = NSAppleEventManager.shared().currentAppleEvent,
+              event.eventID == AEEventID(kAEOpenApplication) else { return false }
+        return event.paramDescriptor(forKeyword: AEKeyword(keyAEPropData))?.enumCodeValue == OSType(keyAELaunchedAsLogInItem)
+    }
+
+    /// Turns ⌥⌘Space on or off to match Settings. The self-test never takes the key from the user.
+    func updateHotKey() {
+        if AppServices.shared.settings.newWindowHotKey && !SelfTest.isRunning { hotKey.register() } else { hotKey.unregister() }
+    }
+
+    /// ⌥⌘Space from any app, like Win+E: a new single-pane window in Downloads, in front.
+    func newWindowFromHotKey() {
+        quietLaunch = false
+        let c = openWindow(state: nil)
+        NSApp.activate()
+        c.window?.makeKeyAndOrderFront(nil)
+    }
+
     @objc func newWindow(_ sender: Any?) {
         let current = (NSApp.keyWindow?.windowController as? BrowserWindowController)?.activePane.folder
         openWindow(state: nil, folder: current)
@@ -67,17 +92,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppServices.shared.store.saveNow()
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// While ⌥⌘Space is on, Luksfer keeps running without a window, so the key keeps working.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        !AppServices.shared.settings.newWindowHotKey
+    }
 
     /// Luksfer came to the front (a keyboard shortcut, ⌘Tab, the Dock) with no window on screen.
     func applicationDidBecomeActive(_ notification: Notification) {
         // A moment later: a hidden app shows its windows again only after it became active, and a
         // shortcut that opens a folder (`open -a Luksfer ~/Downloads`) sends its request just after.
+        guard !quietLaunch else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.showWindowIfNoneOnScreen() }
     }
 
     /// The Dock icon was clicked or the app was opened again while it runs.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        quietLaunch = false
         showWindowIfNoneOnScreen()
         return false
     }
@@ -96,13 +126,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         terminating = true
-        saveWindows()
+        // With no window open, the last closed window's state (saved when it closed) stays.
+        if !controllers.isEmpty { saveWindows() }
         return .terminateNow
     }
 
     /// Folders dropped on the Dock icon or opened with Luksfer (a shortcut that runs
     /// `open -a Luksfer ~/Downloads`) open in a new single-pane window.
     func application(_ application: NSApplication, open urls: [URL]) {
+        quietLaunch = false
         for url in urls {
             var isDir: ObjCBool = false
             guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else { continue }

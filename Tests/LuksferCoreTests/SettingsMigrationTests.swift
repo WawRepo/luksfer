@@ -20,6 +20,14 @@ final class SettingsMigrationTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: box.root.appendingPathComponent("Luksfer/settings.json"), encoding: .utf8), #"{"showHidden":false}"#)
     }
 
+    func testOlderSettingsTurnTheNewWindowKeyOn() {
+        let box = CoreSandbox()
+        box.file("Luksfer/settings.json", #"{"showHidden":true}"#)
+        XCTAssertTrue(SettingsStore(folder: box.root.appendingPathComponent("Luksfer")).settings.newWindowHotKey)
+        box.file("Luksfer/settings.json", #"{"newWindowHotKey":false}"#)
+        XCTAssertFalse(SettingsStore(folder: box.root.appendingPathComponent("Luksfer")).settings.newWindowHotKey)
+    }
+
     func testNothingToCopy() {
         let box = CoreSandbox()
         XCTAssertFalse(SettingsStore.copyOldSettings(from: box.root.appendingPathComponent("Okno"), to: box.root.appendingPathComponent("Luksfer")))
