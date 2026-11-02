@@ -6,6 +6,8 @@ for "window"), so older commits use that name.
 
 **Status:** early (version 0.1). The main features work; expect rough edges.
 
+![Luksfer with two panes: a Projects folder on the left and Downloads on the right](docs/images/two-panes.png)
+
 ## What it does
 
 - Details view by default, in every folder: Name, Date modified, Type, Size.
@@ -20,6 +22,8 @@ for "window"), so older commits use that name.
   "Open in Terminal App" for Terminal, iTerm2, Ghostty or Warp.
 - Network drives (SMB), like Explorer's "Map network drive". Passwords stay in the macOS Keychain.
 - A new window from any app with ⌥⌘Space, like Win+E (see below).
+
+![Luksfer with the terminal panel open below the file list](docs/images/terminal.png)
 
 ## A new window from any app
 

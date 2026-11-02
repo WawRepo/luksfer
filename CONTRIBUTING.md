@@ -43,6 +43,7 @@ changes.
 scripts/build.sh                      # debug build
 LUKSFER_SWIFT=test scripts/build.sh   # unit tests
 scripts/build-app.sh                  # ~/Library/Caches/luksfer-dev/dist/Luksfer.app
+scripts/readme-shots.sh               # the README screenshots, with made-up files in a sandbox
 ```
 
 Build output goes to `~/Library/Caches/luksfer-dev/`, never into the repo. The scripts run one

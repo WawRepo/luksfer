@@ -3,6 +3,7 @@ import AppKit
 /// Switches for test runs, read from the environment. Unused in normal use.
 ///   LUKSFER_OPEN=<folder>       open one window at this folder instead of the saved windows
 ///   LUKSFER_SNAPSHOT=<png>      after LUKSFER_SNAPSHOT_DELAY seconds (default 2), draw the key window into a PNG
+///   LUKSFER_SNAPSHOT_REAL=1     take the window's real screen pixels instead (the terminal's text too)
 ///   LUKSFER_SNAPSHOT_QUIT=1     quit after the snapshot
 ///   LUKSFER_SETTINGS_DIR=<dir>  settings folder (see AppServices)
 ///   LUKSFER_BENCH=<folder>      1 s after launch, open this folder in the active pane three times
@@ -28,7 +29,13 @@ enum DevHooks {
         guard let path = env["LUKSFER_SNAPSHOT"] else { return }
         let delay = Double(env["LUKSFER_SNAPSHOT_DELAY"] ?? "") ?? 2
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            snapshot(to: URL(fileURLWithPath: path))
+            let url = URL(fileURLWithPath: path)
+            if env["LUKSFER_SNAPSHOT_REAL"] == "1",
+               let window = NSApp.windows.first(where: { $0.windowController is BrowserWindowController }) {
+                grab(window, to: url)
+            } else {
+                snapshot(to: url)
+            }
             if env["LUKSFER_SNAPSHOT_QUIT"] == "1" { NSApp.terminate(nil) }
         }
     }
