@@ -148,12 +148,16 @@ public final class SettingsStore {
         }
     }
 
+    /// Only this user can read the file and its folder: it names servers, accounts and folders.
     public func saveNow() {
         do {
-            try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let fm = FileManager.default, folder = fileURL.deletingLastPathComponent()
+            try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+            try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder.path)
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             try encoder.encode(settings).write(to: fileURL, options: .atomic)
+            try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
         } catch {
             NSLog("Luksfer: could not save settings: \(error.localizedDescription)")
         }

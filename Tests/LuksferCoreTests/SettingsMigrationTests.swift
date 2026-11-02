@@ -28,6 +28,26 @@ final class SettingsMigrationTests: XCTestCase {
         XCTAssertFalse(SettingsStore(folder: box.root.appendingPathComponent("Luksfer")).settings.newWindowHotKey)
     }
 
+    func testSavedFileAndFolderArePrivate() throws {
+        let box = CoreSandbox()
+        func mode(_ url: URL) throws -> Int {
+            try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int)
+        }
+        let fresh = SettingsStore(folder: box.root.appendingPathComponent("New"), home: box.root)
+        fresh.saveNow()
+        XCTAssertEqual(try mode(fresh.fileURL), 0o600)
+        XCTAssertEqual(try mode(fresh.fileURL.deletingLastPathComponent()), 0o700)
+
+        // A file and folder from an older version get private at the next save.
+        let oldFile = box.file("Old/settings.json", #"{"showHidden":true}"#), oldFolder = box.root.appendingPathComponent("Old")
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: oldFile.path)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: oldFolder.path)
+        SettingsStore(folder: oldFolder, home: box.root).saveNow()
+        XCTAssertEqual(try mode(oldFile), 0o600)
+        XCTAssertEqual(try mode(oldFolder), 0o700)
+        XCTAssertTrue(SettingsStore(folder: oldFolder, home: box.root).settings.showHidden, "the settings stay")
+    }
+
     func testNothingToCopy() {
         let box = CoreSandbox()
         XCTAssertFalse(SettingsStore.copyOldSettings(from: box.root.appendingPathComponent("Okno"), to: box.root.appendingPathComponent("Luksfer")))

@@ -21,6 +21,10 @@ public struct KeychainError: LocalizedError {
 /// Saves passwords in the macOS Keychain as generic passwords under Luksfer's own service name,
 /// one item per drive. Tests give it a keychain file in their sandbox, so they never touch the
 /// user's keychains.
+///
+/// The login keychain is a file keychain: its items never sync to iCloud, and macOS ignores
+/// `kSecAttrAccessible` there. The data protection keychain, which honors it, needs an Apple
+/// developer team, so it has to wait for a signed release.
 public final class KeychainPasswordStore: PasswordStore {
     public static let service = "io.github.wawrepo.luksfer.network-drive"
     private let keychain: SecKeychain?
