@@ -66,7 +66,7 @@ PLIST
 # permissions and Keychain access then stay across rebuilds), else ad hoc.
 identity="${LUKSFER_SIGN_IDENTITY:-$(security find-identity -p codesigning -v 2>/dev/null | awk -F'"' '/Apple Development/ {print $2; exit}')}"
 identity="${identity:--}"
-codesign --force --sign "$identity" --timestamp=none "$app" 2> /dev/null
+codesign --force --options runtime --sign "$identity" --timestamp=none "$app" 2> /dev/null
 signed="ad hoc"
 [[ "$identity" != "-" ]] && signed="certificate"
 echo "Built $app ($config, version $version, build $build_number, signed: $signed)"
