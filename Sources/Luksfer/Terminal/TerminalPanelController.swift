@@ -172,8 +172,11 @@ final class TerminalPanelController: NSViewController {
 
         // A small margin left and above; the scroller keeps the right edge.
         let bounds = terminalBox.bounds
-        let terminal = ShellTerminalView(frame: NSRect(x: 6, y: 2, width: bounds.width - 6,
-                                                       height: bounds.height - 6))
+        // Start at size zero, then resize: a SwiftTerm terminal made wider than 80 columns has tab
+        // stops for the first 80 only, and wide `ls` output breaks names across lines. A resize
+        // sets all the stops.
+        let terminal = ShellTerminalView(frame: .zero)
+        terminal.frame = NSRect(x: 6, y: 2, width: bounds.width - 6, height: bounds.height - 6)
         terminal.autoresizingMask = [.width, .height]
         terminal.processDelegate = self
         terminal.onUserInput = { [weak self] in self?.session.userInput() }

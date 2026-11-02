@@ -46,11 +46,10 @@ touch -t 202609021130 "$projects/Website"
 touch -t 202608111505 "$projects/Archive"
 touch -t 202610181120 "$downloads/sample-data"
 
-# 80 columns, because the terminal has no tab stops past column 80 yet and wide `ls` output wraps.
 cat > "$home/.zshrc" <<'ZSH'
 PROMPT='%~ %# '
 print -P "${PROMPT}ls"
-COLUMNS=80 ls
+ls
 ZSH
 
 shoot() { # name twoPanes terminalOpen panes
@@ -68,6 +67,11 @@ JSON
        --env LUKSFER_SNAPSHOT="$box/$1.png" --env LUKSFER_SNAPSHOT_REAL=1 \
        --env LUKSFER_SNAPSHOT_DELAY=4 --env LUKSFER_SNAPSHOT_QUIT=1 \
        -a "$app" --args -AppleLocale en_GB
+  # A locked screen gives a blank window. Stop, and keep the old image.
+  if (( $(stat -f%z "$box/$1.png") < 100000 )); then
+    echo "readme-shots.sh: $1 came out blank. Is the screen locked?" >&2
+    exit 1
+  fi
   # sRGB in place of the display's color profile, which can name the display.
   sips -m "/System/Library/ColorSync/Profiles/sRGB Profile.icc" "$box/$1.png" --out "$root/docs/images/$1.png" > /dev/null
 }

@@ -352,6 +352,10 @@ enum SelfTest {
               && !w.activePane.view.isAccessibilityElement())
         w.activePane.navigate(to: folder)
         await wait()
+        // Wide before the shell starts, for tabsPastColumn80: any later resize would hide that bug.
+        let frameBefore = w.window?.frame ?? .zero
+        w.window?.setFrame(NSRect(origin: frameBefore.origin, size: NSSize(width: 1200, height: frameBefore.height)), display: true)
+        await wait()
         w.openTerminal(at: folder, focus: false)
         guard let t = w.terminal else { check("terminal opens", false); return }
         check("terminal starts in the pane's folder", await waitFor(15) { same(t.currentFolder, folder) && t.isAtIdlePrompt })
@@ -361,6 +365,7 @@ enum SelfTest {
         check("Follow leaves no cd line in the terminal", !t.screenText.contains("cd --") && !t.screenText.isEmpty)
         t.type(" builtin cd -- \(ShellQuoting.singleQuoted(folder.path))\r")
         check("Follow: cd in the shell moves the pane", await waitFor(10) { same(w.activePane.folder, folder) })
+        await tabsPastColumn80(in: folder, terminal: t)
         await printedClipboardCodes(in: folder, terminal: t)
         await printedReports(in: folder, window: w, terminal: t)
         t.focusTerminal()
@@ -377,6 +382,8 @@ enum SelfTest {
         check("“term” in the path bar opens the terminal", w.terminalOpen)
         check("a terminal app to open is found", TerminalAppLauncher.applicationURL(for: .terminal) != nil)
         w.closeTerminal()
+        w.window?.setFrame(frameBefore, display: true)
+        await wait()
         // Leave two panes open for the LUKSFER_SELFTEST=restore run.
         w.setTwoPanes(true, focus: false)
         w.panes[1].navigate(to: inner)
@@ -385,6 +392,19 @@ enum SelfTest {
 
     /// OSC 52: text printed in the terminal asks to set the clipboard, then asks to read it. The clipboard
     /// stays as it is and the program gets no answer. (The typed line starts with " builtin cd -- " to stay out of history.)
+    /// Tabs stop every 8 columns across the whole panel, or wide `ls` output breaks names across lines.
+    /// The shell asks the terminal where the cursor is after as many tabs as fit.
+    private static func tabsPastColumn80(in folder: URL, terminal t: TerminalPanelController) async {
+        let answer = folder.deletingLastPathComponent().appendingPathComponent("tab-answer.txt")
+        t.type(#" builtin cd -- .; (n=$(( (COLUMNS - 1) / 8 )); for i in {1..$n}; do printf '\t'; done; printf '\e[6n'; IFS='[;' read -d R -t 2 -s x r c; print -r -- "$COLUMNS $n $c" > "#
+               + ShellQuoting.singleQuoted(answer.path) + ")\r")
+        _ = await waitFor(10) { ((try? String(contentsOf: answer, encoding: .utf8)) ?? "").hasSuffix("\n") }
+        let numbers = ((try? String(contentsOf: answer, encoding: .utf8)) ?? "").split(whereSeparator: \.isWhitespace).compactMap { Int($0) }
+        print("selftest: tabs: columns, tabs, cursor column:", numbers)
+        check("tabs stop every 8 columns past column 80", numbers.count == 3 && numbers[0] > 88 && numbers[2] == numbers[1] * 8 + 1)
+        _ = await waitFor(5) { t.isAtIdlePrompt }
+    }
+
     private static func printedClipboardCodes(in folder: URL, terminal t: TerminalPanelController) async {
         let clipboard = NSPasteboard.general
         let before = clipboard.changeCount, saved = clipboard.string(forType: .string)
