@@ -213,8 +213,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func updateFreeSpace(for folder: URL) {
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            let v = try? folder.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            let text = v?.volumeAvailableCapacityForImportantUsage.map { "\(Formatters.size($0)) free" } ?? ""
+            let text = VolumeSpace.free(at: folder).map { "\(Formatters.size($0)) free" } ?? ""
             DispatchQueue.main.async { self?.statusBar.freeLabel.stringValue = text }
         }
     }
