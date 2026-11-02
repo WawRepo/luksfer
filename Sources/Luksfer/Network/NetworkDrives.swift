@@ -7,10 +7,10 @@ import LuksferCore
 final class NetworkDrives {
     static let shared = NetworkDrives()
 
-    /// `LUKSFER_KEYCHAIN` points test runs at a keychain file in their sandbox, so they never touch
-    /// the user's keychains.
+    /// `LUKSFER_KEYCHAIN` points self-test runs at a keychain file in their sandbox, so they never
+    /// touch the user's keychains.
     let passwords: PasswordStore = {
-        if let file = ProcessInfo.processInfo.environment["LUKSFER_KEYCHAIN"] {
+        if let file = TestSwitches.selfTestOnly("LUKSFER_KEYCHAIN") {
             do { return try KeychainPasswordStore(file: URL(fileURLWithPath: file)) } catch {
                 fatalError("Luksfer: could not open the test keychain: \(error.localizedDescription)")
             }
@@ -18,8 +18,8 @@ final class NetworkDrives {
         return KeychainPasswordStore()
     }()
 
-    /// `LUKSFER_MOUNT_DIR` makes test runs mount inside their sandbox instead of /Volumes.
-    private let mountDir = ProcessInfo.processInfo.environment["LUKSFER_MOUNT_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+    /// `LUKSFER_MOUNT_DIR` makes self-test runs mount inside their sandbox instead of /Volumes.
+    private let mountDir = TestSwitches.selfTestOnly("LUKSFER_MOUNT_DIR").map { URL(fileURLWithPath: $0, isDirectory: true) }
     private var pending: [String: Connection] = [:]
 
     /// A connection being made. The request ID comes a moment after the start.

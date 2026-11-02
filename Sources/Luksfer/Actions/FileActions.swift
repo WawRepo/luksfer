@@ -10,8 +10,8 @@ extension Notification.Name {
 /// the name-clash dialog, and progress in the status bar. Every change is undoable or asks first.
 final class FileActions {
     static let shared = FileActions()
-    /// `LUKSFER_TRASH_DIR` gives test runs a sandbox "Trash" so they never touch the real one.
-    let engine = FileOperationEngine(trasher: ProcessInfo.processInfo.environment["LUKSFER_TRASH_DIR"]
+    /// `LUKSFER_TRASH_DIR` gives self-test runs a sandbox "Trash" so they never touch the real one.
+    let engine = FileOperationEngine(trasher: TestSwitches.selfTestOnly("LUKSFER_TRASH_DIR")
         .map { FolderTrasher(folder: URL(fileURLWithPath: $0, isDirectory: true)) as Trasher } ?? SystemTrasher())
     private var undoManager: UndoManager { AppServices.shared.undoManager }
     private var running: Task<Void, Never>?

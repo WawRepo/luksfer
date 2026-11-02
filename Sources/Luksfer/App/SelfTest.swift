@@ -8,24 +8,24 @@ import Quartz
 @MainActor
 enum SelfTest {
     static func scheduleIfAsked() {
-        if ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] == "restore" {
-            Task { await restore() }
-            return
+        switch ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] {
+        case "restore": Task { await restore() }
+        case "opened": Task { await opened() }
+        case "1":
+            // Every mode ends by quitting (see `TestSwitches`), this one too when it cannot run.
+            guard TestSwitches.selfTestOnly("LUKSFER_TRASH_DIR") != nil, let folder = DevHooks.openFolder else {
+                FileHandle.standardError.write(Data("selftest: LUKSFER_SELFTEST=1 needs LUKSFER_TRASH_DIR and LUKSFER_OPEN\n".utf8))
+                exit(2)
+            }
+            Task { await run(in: folder) }
+        default: break
         }
-        if ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] == "opened" {
-            Task { await opened() }
-            return
-        }
-        guard ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] == "1",
-              ProcessInfo.processInfo.environment["LUKSFER_TRASH_DIR"] != nil,
-              let folder = DevHooks.openFolder else { return }
-        Task { await run(in: folder) }
     }
 
     private static var failures = 0
 
     /// Any self-test mode. The self-test never takes ⌥⌘Space from the user.
-    nonisolated static var isRunning: Bool { ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] != nil }
+    nonisolated static var isRunning: Bool { TestSwitches.isSelfTest() }
 
     private static func check(_ name: String, _ ok: Bool) {
         if !ok { failures += 1 }
@@ -421,7 +421,7 @@ enum SelfTest {
     /// Network drives: the dialog, the Keychain and the sidebar. No server runs in the
     /// test, so the connection fails on purpose. LUKSFER_KEYCHAIN keeps every password in the sandbox.
     private static func networkDrives(window w: BrowserWindowController) async {
-        guard ProcessInfo.processInfo.environment["LUKSFER_KEYCHAIN"] != nil else {
+        guard TestSwitches.selfTestOnly("LUKSFER_KEYCHAIN") != nil else {
             FileHandle.standardError.write(Data("selftest: SKIP network drives (no LUKSFER_KEYCHAIN sandbox keychain)\n".utf8))
             return
         }

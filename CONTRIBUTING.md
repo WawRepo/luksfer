@@ -79,6 +79,9 @@ grep selftest "$root/opened.log"
   keychain.
 - `LUKSFER_MOUNT_DIR`: where test network drives would mount, instead of `/Volumes`.
 
+The Trash, keychain and mount switches count only in a self-test mode (`1`, `restore`, `opened`), and
+each mode quits when it ends. A normal launch ignores them.
+
 ## Commits and pull requests
 
 - English everywhere: app text, code, comments, commits and docs.

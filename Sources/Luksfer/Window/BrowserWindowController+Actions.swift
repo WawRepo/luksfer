@@ -248,7 +248,7 @@ extension BrowserWindowController: NSToolbarDelegate {
 enum FileClipboard {
     static let cutType = NSPasteboard.PasteboardType("io.github.wawrepo.luksfer.cut")
     /// The general pasteboard. Self-test runs use a private one, so the user's clipboard stays as it is.
-    static let pasteboard: NSPasteboard = ProcessInfo.processInfo.environment["LUKSFER_SELFTEST"] != nil
+    static let pasteboard: NSPasteboard = TestSwitches.isSelfTest()
         ? NSPasteboard(name: .init("io.github.wawrepo.luksfer.selftest")) : .general
 
     static var hasFiles: Bool {
