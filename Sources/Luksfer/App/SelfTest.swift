@@ -451,6 +451,19 @@ enum SelfTest {
               && !passwords.hasPassword(for: drive.id) && !networkRows().contains { $0.drive != nil })
     }
 
+    /// Compress with names that look like zip options: they stay file names, and no command runs.
+    private static func compressOddNames(in folder: URL, window w: BrowserWindowController) async {
+        let box = folder.appendingPathComponent("odd names")
+        try? FileManager.default.createDirectory(at: box, withIntermediateDirectories: true)
+        let items = ["-T", "-TTtouch marker", "notes.txt"].map { box.appendingPathComponent($0) }
+        items.forEach { FileManager.default.createFile(atPath: $0.path, contents: Data("text".utf8)) }
+        FileActions.shared.compress(items, in: w)
+        let made = await waitFor(10) { names(box).contains("Archive.zip") }
+        await settle()
+        check("Compress keeps names that look like zip options as file names, and runs nothing",
+              made && !names(box).contains("marker"))
+    }
+
     private static func newWindow() async {
         let before = NSApp.windows.filter { $0.windowController is BrowserWindowController }.count
         (NSApp.delegate as? AppDelegate)?.newWindow(nil)
@@ -686,6 +699,7 @@ enum SelfTest {
         await questions(in: folder, window: w)
         await navigation(in: folder, window: w)
         await drops(in: folder, window: w)
+        await compressOddNames(in: folder, window: w)
         await newWindow()
         await comeBack(in: folder, window: w)
         await hotKey(window: w)

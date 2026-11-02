@@ -179,10 +179,10 @@ final class FileActions {
                 p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
                 p.arguments = ["-c", "-k", "--sequesterRsrc", "--keepParent", urls[0].path, zip.path]
             } else {
-                // Several items: zip them by name from their folder (-y keeps links as links).
-                p.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+                // Several items: zip them by name from their folder.
+                p.executableURL = ZipCommand.executable
                 p.currentDirectoryURL = folder
-                p.arguments = ["-r", "-y", "-q", zip.path] + urls.map(\.lastPathComponent)
+                p.arguments = ZipCommand.arguments(zip: zip.path, names: urls.map(\.lastPathComponent))
             }
             try? p.run()
             p.waitUntilExit()
