@@ -66,7 +66,13 @@ PLIST
 # permissions and Keychain access then stay across rebuilds), else ad hoc.
 identity="${LUKSFER_SIGN_IDENTITY:-$(security find-identity -p codesigning -v 2>/dev/null | awk -F'"' '/Apple Development/ {print $2; exit}')}"
 identity="${identity:--}"
-codesign --force --options runtime --sign "$identity" --timestamp=none "$app" 2> /dev/null
+# Apple's notary service needs a secure timestamp from Apple's server. Everyday builds skip it.
+timestamp=--timestamp=none
+[[ "$identity" == "Developer ID Application"* ]] && timestamp=--timestamp
+if ! output=$(codesign --force --options runtime --sign "$identity" "$timestamp" "$app" 2>&1); then
+  print -r -- "$output" >&2
+  exit 1
+fi
 signed="ad hoc"
 [[ "$identity" != "-" ]] && signed="certificate"
 echo "Built $app ($config, version $version, build $build_number, signed: $signed)"
