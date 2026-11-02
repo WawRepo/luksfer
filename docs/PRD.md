@@ -203,12 +203,14 @@ inside the window. It is the app you open for everyday file work instead of Find
 
 ## 7. Distribution
 
-- Each version is a GitHub Release with a disk image (`Luksfer-<version>.dmg`) and its SHA-256
-  checksum. A GitHub Actions workflow builds it when a version tag (`v0.1.0`) is pushed.
+- Each version is a GitHub Release with a disk image (`Luksfer-<version>.dmg`), its SHA-256
+  checksum and an attestation: a signed record of the repo, commit and workflow that built the
+  file. A GitHub Actions workflow builds it when a version tag (`v0.1.0`) is pushed.
+- Anyone can check a copy with `gh attestation verify Luksfer-<version>.dmg --repo WawRepo/luksfer`.
 - Install: open the disk image and drag Luksfer to Applications.
-- The app is not notarized yet, so macOS blocks the first open. The user allows it once in System
-  Settings > Privacy & Security > Open Anyway. Developer ID signing and notarization remove this
-  step; they need a paid Apple Developer account (open question, 9).
+- The app is not notarized in version 1, so macOS blocks the first open. The user allows it once
+  in System Settings > Privacy & Security > Open Anyway. `scripts/release.sh` can sign with
+  Developer ID and notarize if this changes.
 
 ## 8. Out of scope for version 1
 
@@ -224,8 +226,6 @@ inside the window. It is the app you open for everyday file work instead of Find
   the file viewer (5.11).
 - **Function keys.** F2 needs the Fn key on most Mac keyboards. The Finder keys setting makes Enter
   rename instead.
-- **Notarization.** A paid Apple Developer account removes the first-open step (7). Decide before
-  the first public release.
 - **Competition.** ForkLift, Path Finder, Commander One and QSpace Pro are mature. Luksfer's edge is
   Windows habits, the built-in terminal and a developer focus.
 
@@ -244,4 +244,5 @@ inside the window. It is the app you open for everyday file work instead of Find
    bar. Network drives were added after this milestone.
 6. **Daily use** — next. Use Luksfer as the everyday file manager, fix what hurts, add the default
    file viewer switch. Then decide on tabs and the Icons view.
-7. **First public release** — a notarized (or clearly documented) disk image on GitHub Releases.
+7. **First public release** — a disk image on GitHub Releases, with an attestation and clear
+   install steps.

@@ -1,13 +1,17 @@
 name: Release
 
 # Push a version tag (git tag v0.1.0 && git push origin v0.1.0) to build the disk image and
-# publish it as a GitHub Release.
+# publish it as a GitHub Release, with an attestation: a signed record of the repo, commit and
+# workflow that built the file. GitHub makes attestations free only on public repos.
 on:
   push:
     tags: ['v*']
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
 
 jobs:
   release:
@@ -24,7 +28,14 @@ jobs:
       - name: Unit tests
         run: LUKSFER_SWIFT=test scripts/build.sh
       - name: Build the disk image
-        run: scripts/release.sh "$GITHUB_REF_NAME"
+        id: build
+        run: |
+          scripts/release.sh "$GITHUB_REF_NAME"
+          echo "dmg=$HOME/Library/Caches/luksfer-dev/release/Luksfer-${GITHUB_REF_NAME#v}.dmg" >> "$GITHUB_OUTPUT"
+      - name: Record that this workflow built the disk image
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ steps.build.outputs.dmg }}
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}

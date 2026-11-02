@@ -37,9 +37,15 @@ Win+E on Windows.
 
 1. Download `Luksfer-<version>.dmg` from the [Releases page](../../releases).
 2. Open it and drag Luksfer to Applications.
-3. The app is not notarized by Apple yet, so macOS blocks the first open. Open Luksfer once, then
+3. The app is not notarized by Apple, so macOS blocks the first open. Open Luksfer once, then
    go to System Settings > Privacy & Security and click **Open Anyway**. You do this only once per
    version.
+
+To check that GitHub built your copy from this repo, use the [GitHub CLI](https://cli.github.com):
+
+```sh
+gh attestation verify Luksfer-<version>.dmg --repo WawRepo/luksfer
+```
 
 Needs a Mac with Apple Silicon and macOS 15 or newer.
 
