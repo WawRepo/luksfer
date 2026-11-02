@@ -361,6 +361,7 @@ enum SelfTest {
         check("Follow leaves no cd line in the terminal", !t.screenText.contains("cd --") && !t.screenText.isEmpty)
         t.type(" builtin cd -- \(ShellQuoting.singleQuoted(folder.path))\r")
         check("Follow: cd in the shell moves the pane", await waitFor(10) { same(w.activePane.folder, folder) })
+        await printedClipboardCodes(in: folder, terminal: t)
         t.focusTerminal()
         await wait()
         w.activePane.list.select([folder.appendingPathComponent("notes.md")], scroll: false)
@@ -379,6 +380,25 @@ enum SelfTest {
         w.setTwoPanes(true, focus: false)
         w.panes[1].navigate(to: inner)
         await wait()
+    }
+
+    /// OSC 52: text printed in the terminal asks to set the clipboard, then asks to read it. The clipboard
+    /// stays as it is and the program gets no answer. (The typed line starts with " builtin cd -- " to stay out of history.)
+    private static func printedClipboardCodes(in folder: URL, terminal t: TerminalPanelController) async {
+        let clipboard = NSPasteboard.general
+        let before = clipboard.changeCount, saved = clipboard.string(forType: .string)
+        let answer = folder.deletingLastPathComponent().appendingPathComponent("clipboard-answer.txt")
+        t.type(#" builtin cd -- .; printf '\e]52;c;bHVrc2Zlci1zZWxmdGVzdA==\a\e]52;c;?\a'; read -t 2 -k 1 r; print -r -- "${#r}" > "#
+               + ShellQuoting.singleQuoted(answer.path) + "\r")
+        let done = await waitFor(10) { ((try? String(contentsOf: answer, encoding: .utf8)) ?? "").hasSuffix("\n") }
+        await wait()
+        check("printed OSC 52 cannot change the clipboard", done && clipboard.changeCount == before)
+        check("printed OSC 52 cannot read the clipboard", done && (try? String(contentsOf: answer, encoding: .utf8)) == "0\n")
+        if clipboard.changeCount != before, let saved {   // only after a failure
+            clipboard.clearContents()
+            clipboard.setString(saved, forType: .string)
+        }
+        _ = await waitFor(5) { t.isAtIdlePrompt }
     }
 
     /// ⌘N opens a second window.

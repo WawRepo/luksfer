@@ -14,11 +14,13 @@ final class ShellTerminalView: LocalProcessTerminalView {
     var onUserInput: (() -> Void)?
 
     private var keyMonitor: Any?
+    private lazy var clipboardGuard = TerminalClipboardGuard(view: self)
 
     override init(frame: CGRect) {
         super.init(frame: frame,
                    font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
                    options: TerminalOptions(scrollback: 10_000))
+        terminalDelegate = clipboardGuard
         optionAsMetaKey = false
         applyTheme()
         setAccessibilityLabel("Terminal")
@@ -79,5 +81,35 @@ final class ShellTerminalView: LocalProcessTerminalView {
         selectedTextBackgroundColor = theme.selection
         selectedTextForegroundColor = theme.foreground
         updateColorScheme(TerminalTheme.isDark(effectiveAppearance) ? .dark : .light)
+    }
+}
+
+/// The terminal view's delegate. Text a program prints can ask for the clipboard (OSC 52): to set it
+/// or to read it, with no prompt. `LocalProcessTerminalView` answers with the real clipboard in
+/// methods a subclass cannot override, so this delegate refuses both and passes the rest on, like
+/// Terminal.app, which has OSC 52 off. Copy and paste by the user do not come through here.
+private final class TerminalClipboardGuard: TerminalViewDelegate {
+    private unowned let view: LocalProcessTerminalView
+
+    init(view: LocalProcessTerminalView) { self.view = view }
+
+    func clipboardCopy(source: TerminalView, content: Data) {}
+    func clipboardRead(source: TerminalView) -> Data? { nil }
+
+    func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
+        view.sizeChanged(source: source, newCols: newCols, newRows: newRows)
+    }
+    func setTerminalTitle(source: TerminalView, title: String) { view.setTerminalTitle(source: source, title: title) }
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+        view.hostCurrentDirectoryUpdate(source: source, directory: directory)
+    }
+    func send(source: TerminalView, data: ArraySlice<UInt8>) { view.send(source: source, data: data) }
+    func scrolled(source: TerminalView, position: Double) { view.scrolled(source: source, position: position) }
+    func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {
+        view.requestOpenLink(source: source, link: link, params: params)
+    }
+    func rangeChanged(source: TerminalView, startY: Int, endY: Int) { view.rangeChanged(source: source, startY: startY, endY: endY) }
+    func programStatusChanged(source: TerminalView, records: [TerminalProgramStatus]) {
+        view.programStatusChanged(source: source, records: records)
     }
 }

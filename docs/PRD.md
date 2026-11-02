@@ -150,6 +150,8 @@ inside the window. It is the app you open for everyday file work instead of Find
 - **Outside:** Open in Terminal App (⌥⌘T) opens Terminal, iTerm2, Ghostty or Warp in that folder. A
   setting picks the app.
 - The `term` word in the path bar (5.3).
+- Text a program prints cannot read or set the clipboard (OSC 52 is off, like Terminal.app). ⌘C and
+  ⌘V work as usual.
 
 ### 5.8 Network drives
 
