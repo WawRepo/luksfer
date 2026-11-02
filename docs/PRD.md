@@ -151,7 +151,8 @@ inside the window. It is the app you open for everyday file work instead of Find
   setting picks the app.
 - The `term` word in the path bar (5.3).
 - Text a program prints cannot read or set the clipboard (OSC 52 is off, like Terminal.app). ⌘C and
-  ⌘V work as usual.
+  ⌘V work as usual. It also cannot pass as a report from the shell: each zsh gets a random key that
+  child programs never see, and Luksfer reads only reports with that key.
 
 ### 5.8 Network drives
 

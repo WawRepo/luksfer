@@ -18,11 +18,14 @@ final class ShellLaunchPlanTests: XCTestCase {
         let plan = ShellLaunchPlan.make(accountShell: "/bin/zsh", isExecutable: { _ in true }, base: base,
                                         processEnvironment: ["PATH": "/usr/bin:/bin", "ZDOTDIR": "/z",
                                                              "SSH_AUTH_SOCK": "/sock", "TERM_PROGRAM": "x"],
-                                        home: "/Users/u", user: "u", shellFilesFolder: "/luksfer/shell")
+                                        home: "/Users/u", user: "u", shellFilesFolder: "/luksfer/shell",
+                                        sessionKey: "k1")
         XCTAssertEqual(plan.executable, "/bin/zsh")
         XCTAssertEqual(plan.argv0, "-zsh")
         XCTAssertTrue(plan.usesZshIntegration)
+        XCTAssertEqual(plan.sessionKey, "k1")
         let e = env(plan)
+        XCTAssertEqual(e["LUKSFER_SESSION_KEY"], "k1")
         XCTAssertEqual(e["ZDOTDIR"], "/luksfer/shell")
         XCTAssertEqual(e["LUKSFER_USER_ZDOTDIR"], "/z")
         XCTAssertEqual(e["LUKSFER_ZDOTDIR_EXPORTED"], "1")
@@ -66,6 +69,8 @@ final class ShellLaunchPlanTests: XCTestCase {
         XCTAssertFalse(plan.usesZshIntegration)
         XCTAssertNil(env(plan)["ZDOTDIR"])
         XCTAssertNil(env(plan)["LUKSFER_USER_ZDOTDIR"])
+        XCTAssertNil(plan.sessionKey)
+        XCTAssertNil(env(plan)["LUKSFER_SESSION_KEY"])
     }
 
     func testFallsBackToZsh() {

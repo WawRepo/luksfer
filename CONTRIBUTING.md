@@ -35,7 +35,7 @@ changes.
 - Listing: `readdir` + `fstatat` on a background queue; the type comes from the file extension, and
   "only in the cloud" from the `SF_DATALESS` flag.
 - Terminal: [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) (MIT). zsh integration through
-  `ZDOTDIR`: OSC 7 reports the folder, a private OSC 6973 marks the prompt and each command.
+  `ZDOTDIR`: a private OSC 6973 with a per-shell key reports the folder, the prompt and each command.
 
 ## Build and test
 

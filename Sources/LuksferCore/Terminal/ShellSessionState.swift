@@ -12,6 +12,26 @@ public enum ShellMark: String, Sendable {
     public init?(payload: String) { self.init(rawValue: payload) }
 }
 
+/// A report from Luksfer's zsh integration: the payload of `OSC 6973 ; <session key> ; <report>`.
+public enum ShellReport: Equatable, Sendable {
+    case mark(ShellMark)
+    /// The folder as a file URL, read with `OSC7`.
+    case folder(String)
+
+    /// Nil without the right session key: anything a program prints reaches the terminal too.
+    public init?(payload: String, key: String) {
+        let parts = payload.split(separator: ";", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
+        guard parts.count >= 2, !key.isEmpty, parts[0] == key else { return nil }
+        if parts[1] == "folder", parts.count == 3 {
+            self = .folder(parts[2])
+        } else if parts.count == 2, let mark = ShellMark(payload: parts[1]) {
+            self = .mark(mark)
+        } else {
+            return nil
+        }
+    }
+}
+
 /// What the terminal panel knows about its shell: the folder, and whether it waits at an empty
 /// prompt. Pure state: the panel feeds it the shell's marks and the user's input, and acts on
 /// what it returns.
@@ -84,7 +104,7 @@ public struct ShellSessionState: Equatable, Sendable {
         return nil
     }
 
-    /// The shell reported `folder` (OSC 7). Nil when it is the same folder as before.
+    /// The shell reported `folder`. Nil when it is the same folder as before.
     public mutating func reported(folder url: URL) -> FolderChange? {
         let path = Self.path(of: url)
         if let current = folder, Self.path(of: current) == path { return nil }

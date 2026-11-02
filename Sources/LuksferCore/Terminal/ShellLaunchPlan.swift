@@ -10,6 +10,8 @@ public struct ShellLaunchPlan: Equatable, Sendable {
     public var environment: [String]
     /// zsh with `ZDOTDIR` pointing at Luksfer's integration files.
     public var usesZshIntegration: Bool
+    /// The key on the shell's reports (`ShellReport`). Nil without the integration.
+    public var sessionKey: String?
 
     public static let fallbackShell = "/bin/zsh"
     public static let fallbackPath = "/usr/bin:/bin:/usr/sbin:/sbin"
@@ -21,13 +23,15 @@ public struct ShellLaunchPlan: Equatable, Sendable {
     ///   - base: starting entries, SwiftTerm's `Terminal.getEnvironmentVariables(termName:)`.
     ///   - processEnvironment: Luksfer's own environment.
     ///   - shellFilesFolder: where `ZshIntegration.files()` were written; nil to skip the integration.
+    ///   - sessionKey: the key for this shell's reports.
     public static func make(accountShell: String?,
                             isExecutable: (String) -> Bool,
                             base: [String],
                             processEnvironment: [String: String],
                             home: String,
                             user: String,
-                            shellFilesFolder: String?) -> ShellLaunchPlan {
+                            shellFilesFolder: String?,
+                            sessionKey: String = ZshIntegration.newSessionKey()) -> ShellLaunchPlan {
         var shell = fallbackShell
         if let candidate = accountShell, !candidate.isEmpty, isExecutable(candidate) { shell = candidate }
         let name = (shell as NSString).lastPathComponent
@@ -48,9 +52,11 @@ public struct ShellLaunchPlan: Equatable, Sendable {
             env.set("ZDOTDIR", folder)
             env.set("LUKSFER_USER_ZDOTDIR", processEnvironment["ZDOTDIR"] ?? home)
             if processEnvironment["ZDOTDIR"] != nil { env.set("LUKSFER_ZDOTDIR_EXPORTED", "1") }
+            env.set(ZshIntegration.sessionKeyVariable, sessionKey)
         }
         return ShellLaunchPlan(executable: shell, argv0: "-" + name,
-                               environment: env.entries, usesZshIntegration: zsh)
+                               environment: env.entries, usesZshIntegration: zsh,
+                               sessionKey: zsh ? sessionKey : nil)
     }
 
     /// `NAME=value` entries in order; setting a name again replaces its value in place.

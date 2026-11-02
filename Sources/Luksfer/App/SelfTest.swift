@@ -362,6 +362,7 @@ enum SelfTest {
         t.type(" builtin cd -- \(ShellQuoting.singleQuoted(folder.path))\r")
         check("Follow: cd in the shell moves the pane", await waitFor(10) { same(w.activePane.folder, folder) })
         await printedClipboardCodes(in: folder, terminal: t)
+        await printedReports(in: folder, window: w, terminal: t)
         t.focusTerminal()
         await wait()
         w.activePane.list.select([folder.appendingPathComponent("notes.md")], scroll: false)
@@ -399,6 +400,21 @@ enum SelfTest {
             clipboard.setString(saved, forType: .string)
         }
         _ = await waitFor(5) { t.isAtIdlePrompt }
+    }
+
+    /// Text a program prints cannot pass as a report from the shell: a fake folder does not move the
+    /// pane, and a fake prompt does not make Luksfer type the Follow keys into the running program.
+    private static func printedReports(in folder: URL, window w: BrowserWindowController, terminal t: TerminalPanelController) async {
+        let other = folder.appendingPathComponent("New folder")
+        let url = "file://localhost" + (other.path.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? other.path)
+        let before = w.activePane.folder, shellBefore = t.currentFolder
+        t.type(#" builtin cd -- .; printf '\e]7;%s\a\e]6973;wrong;folder;%s\a\e]6973;prompt\a\e]6973;wrong;prompt\a' "#
+               + ShellQuoting.singleQuoted(url) + " " + ShellQuoting.singleQuoted(url) + "; sleep 2\r")
+        await wait(1)
+        check("a printed folder report does not move the pane or the shell's folder",
+              w.activePane.folder == before && t.currentFolder == shellBefore)
+        check("a printed prompt mark does not count as a prompt", !t.isAtIdlePrompt)
+        check("the real prompt comes back after the program", await waitFor(10) { t.isAtIdlePrompt })
     }
 
     /// ⌘N opens a second window.

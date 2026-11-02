@@ -15,7 +15,7 @@ final class TerminalPanelController: NSViewController {
         didSet { header.follow = followEnabled }
     }
 
-    /// The last folder the shell reported (OSC 7).
+    /// The last folder the shell reported.
     private(set) var currentFolder: URL?
 
     /// The shell waits at its prompt and nothing was typed since.
@@ -26,6 +26,8 @@ final class TerminalPanelController: NSViewController {
 
     private let startFolder: URL
     private let shellFilesFolder: URL
+    /// The key on this shell's reports. Nil without the zsh integration.
+    private var sessionKey: String?
     private let header = TerminalPanelHeader()
     private let terminalBox = TerminalBackgroundView()
     private var terminalView: ShellTerminalView?
@@ -180,6 +182,7 @@ final class TerminalPanelController: NSViewController {
         oscObservation = observeShell(terminal)
 
         let plan = launchPlan()
+        sessionKey = plan.sessionKey
         var isFolder: ObjCBool = false
         let exists = FileManager.default.fileExists(atPath: folder.path, isDirectory: &isFolder)
         terminal.startProcess(executable: plan.executable, args: [], environment: plan.environment,
@@ -193,7 +196,7 @@ final class TerminalPanelController: NSViewController {
         }
     }
 
-    /// OSC 7 and the prompt marks, read from one ordered stream so a folder never overtakes
+    /// The shell's reports and OSC 7, read from one ordered stream so a folder never overtakes
     /// the prompt that follows it.
     private func observeShell(_ terminal: ShellTerminalView) -> TerminalOscObservation {
         terminal.observeOscEvents { [weak self, weak terminal] event in
@@ -209,12 +212,25 @@ final class TerminalPanelController: NSViewController {
         }
     }
 
+    /// With the zsh integration only reports with this shell's key count. Without it (another
+    /// shell, with a config that sends OSC 7) there is no way to tell, and no mark means Luksfer
+    /// never types into that shell, so a printed OSC 7 can only move the pane.
     private func handleOsc(code: Int, payload: String) {
-        if code == ZshIntegration.markCode {
-            guard let mark = ShellMark(payload: payload) else { return }
-            if let line = session.received(mark) { terminalView?.send(txt: line) }
+        guard let key = sessionKey else {
+            if code == 7 { folderReported(payload) }
             return
         }
+        guard code == ZshIntegration.markCode, let report = ShellReport(payload: payload, key: key) else { return }
+        switch report {
+        case .mark(let mark):
+            if let line = session.received(mark) { terminalView?.send(txt: line) }
+        case .folder(let url):
+            folderReported(url)
+        }
+    }
+
+    /// `payload`: the folder as a file URL.
+    private func folderReported(_ payload: String) {
         guard let host = OSC7.host(fromPayload: payload),
               OSC7.isLocal(host: host, localHostName: Self.localHostName),
               let folder = OSC7.folder(fromPayload: payload),

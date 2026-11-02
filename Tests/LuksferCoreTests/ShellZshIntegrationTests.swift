@@ -22,8 +22,9 @@ final class ShellZshIntegrationTests: XCTestCase {
 
     func testZshrcHasTheHooks() throws {
         let zshrc = try XCTUnwrap(ZshIntegration.files()[".zshrc"])
-        for needle in [#"\e]7;file://"#, #"\e]6973;prompt\a"#, #"\e]6973;prompt-typed\a"#,
-                       #"\e]6973;exec\a"#, "add-zsh-hook precmd __luksfer_precmd",
+        for needle in [#"$'\e]6973;'"${__luksfer_key-};$1"$'\a'"#, #"__luksfer_report "folder;file://"#,
+                       "__luksfer_report prompt\n", "__luksfer_report prompt-typed\n",
+                       "__luksfer_report exec", "add-zsh-hook precmd __luksfer_precmd",
                        "add-zsh-hook preexec __luksfer_preexec",
                        "add-zle-hook-widget line-init __luksfer_line_init", "is-at-least 5.3",
                        "add-zsh-hook precmd __luksfer_prompt_fallback", "PENDING", "CONTEXT",
@@ -38,6 +39,23 @@ final class ShellZshIntegrationTests: XCTestCase {
         XCTAssertNil(ShellMark(payload: "nonsense"))
     }
 
+    func testReportsNeedTheSessionKey() {
+        XCTAssertEqual(ShellReport(payload: "k1;prompt", key: "k1"), .mark(.prompt))
+        XCTAssertEqual(ShellReport(payload: "k1;prompt-typed", key: "k1"), .mark(.promptTyped))
+        XCTAssertEqual(ShellReport(payload: "k1;exec", key: "k1"), .mark(.exec))
+        XCTAssertEqual(ShellReport(payload: "k1;folder;file://host/a;b", key: "k1"), .folder("file://host/a;b"))
+        for fake in ["prompt", "k2;prompt", ";prompt", "k1", "k1;nonsense", "k1;folder", "k1;prompt;x", "K1;prompt", ""] {
+            XCTAssertNil(ShellReport(payload: fake, key: "k1"), fake)
+        }
+        XCTAssertNil(ShellReport(payload: ";prompt", key: ""), "an empty key never matches")
+    }
+
+    func testEachSessionKeyIsNew() {
+        let keys = Set((0..<20).map { _ in ZshIntegration.newSessionKey() })
+        XCTAssertEqual(keys.count, 20)
+        for key in keys { XCTAssertTrue(key.count == 32 && key.allSatisfy(\.isHexDigit), key) }
+    }
+
     /// A login, interactive zsh with a made-up user config: the user's files load in zsh's order,
     /// see their own ZDOTDIR, keep top-level variables, and the hooks are installed.
     func testRealZshLoadsUserFilesAndHooks() throws {
@@ -49,7 +67,7 @@ final class ShellZshIntegrationTests: XCTestCase {
         for (name, text) in ZshIntegration.files() {
             try text.write(to: files.appendingPathComponent(name), atomically: true, encoding: .utf8)
         }
-        try sandbox.write("order+=(zshenv:$ZDOTDIR)\n", to: "home/.zshenv")
+        try sandbox.write("order+=(zshenv:$ZDOTDIR)\nkeyseen=${LUKSFER_SESSION_KEY-no}\n", to: "home/.zshenv")
         try sandbox.write("order+=(zprofile:$ZDOTDIR)\ntypeset -U path\nkept=yes\n", to: "home/.zprofile")
         try sandbox.write("order+=(zshrc:$ZDOTDIR)\nsetopt nounset noclobber\n", to: "home/.zshrc")
         try sandbox.write("order+=(zlogin:${ZDOTDIR:-unset})\n", to: "home/.zlogin")
@@ -59,13 +77,15 @@ final class ShellZshIntegrationTests: XCTestCase {
         print -r -- "kept=$kept zdotdir=${ZDOTDIR-unset} user=${LUKSFER_USER_ZDOTDIR-unset}"
         print -r -- "histfile=$HISTFILE"
         print -r -- "precmd=${(j:,:)precmd_functions} preexec=${(j:,:)preexec_functions}"
+        print -r -- "key-here=${LUKSFER_SESSION_KEY-gone} key-in-child=$(/usr/bin/env | /usr/bin/grep -c LUKSFER_SESSION_KEY)"
+        print -r -- "key-seen-in-user-file=$keyseen"
         TTY=/dev/stdout
-        __luksfer_osc7; print
+        __luksfer_report_folder; print
         if __luksfer_addhistory " builtin cd -- '/x'"$'\n'; then print history=kept; else print history=dropped; fi
         """#
         let out = try runShell("/bin/zsh", ["-l", "-i", "-c", script], environment: [
             "HOME": home.path, "PATH": "/usr/bin:/bin", "TERM": "dumb", "LANG": "en_US.UTF-8",
-            "ZDOTDIR": files.path, "LUKSFER_USER_ZDOTDIR": home.path,
+            "ZDOTDIR": files.path, "LUKSFER_USER_ZDOTDIR": home.path, "LUKSFER_SESSION_KEY": "testkey",
         ], in: start)
         let lines = out.split(separator: "\n").map(String.init)
         let h = home.path
@@ -75,9 +95,12 @@ final class ShellZshIntegrationTests: XCTestCase {
         XCTAssertTrue(lines.contains("precmd=__luksfer_precmd preexec=__luksfer_preexec"), out)
         XCTAssertTrue(lines.contains("history=dropped"), out)
 
-        let osc = try XCTUnwrap(lines.first { $0.hasPrefix("\u{1B}]7;") }, out)
+        XCTAssertTrue(lines.contains("key-here=gone key-in-child=0"), out)
+        XCTAssertTrue(lines.contains("key-seen-in-user-file=no"), out)
+        let osc = try XCTUnwrap(lines.first { $0.hasPrefix("\u{1B}]6973;") }, out)
         XCTAssertTrue(osc.hasSuffix("\u{07}"))
-        let payload = String(osc.dropFirst(4).dropLast())
+        let report = ShellReport(payload: String(osc.dropFirst(7).dropLast()), key: "testkey")
+        guard case .folder(let payload)? = report else { return XCTFail(out) }
         XCTAssertEqual(OSC7.folder(fromPayload: payload)?.path, start.path)
         XCTAssertTrue(payload.contains("/a%20b%27c/za"), payload)
         XCTAssertTrue(payload.unicodeScalars.allSatisfy(\.isASCII), payload)
@@ -106,14 +129,15 @@ final class ShellZshIntegrationTests: XCTestCase {
         try sandbox.write("PS1='%~ %# '\nbindkey -v\nsetopt nounset\nchpwd() { print HOOK-OUTPUT }\n", to: "home/.zshrc")
         let shell = try PseudoTerminalShell("/bin/zsh", ["-i"], environment: [
             "HOME": home.path, "PATH": "/usr/bin:/bin", "TERM": "xterm-256color", "LANG": "en_US.UTF-8",
-            "ZDOTDIR": files.path, "LUKSFER_USER_ZDOTDIR": home.path,
+            "ZDOTDIR": files.path, "LUKSFER_USER_ZDOTDIR": home.path, "LUKSFER_SESSION_KEY": "testkey",
         ], in: home)
         defer { shell.stop() }
-        XCTAssertTrue(shell.read(until: "\u{1B}]6973;prompt\u{07}", timeout: 10).contains("6973;prompt"), "first prompt")
+        let prompt = "\u{1B}]6973;testkey;prompt\u{07}"
+        XCTAssertTrue(shell.read(until: prompt, timeout: 10).contains(prompt), "first prompt")
         shell.write(ZshIntegration.followKeys(to: target.path))
-        let after = shell.read(until: "\u{1B}]6973;prompt\u{07}", timeout: 10)
-        XCTAssertTrue(after.contains("6973;prompt\u{07}"), after.debugDescription)
-        let osc = try XCTUnwrap(after.components(separatedBy: "\u{1B}]7;").dropFirst().first?.components(separatedBy: "\u{07}").first)
+        let after = shell.read(until: prompt, timeout: 10)
+        XCTAssertTrue(after.contains(prompt), after.debugDescription)
+        let osc = try XCTUnwrap(after.components(separatedBy: "\u{1B}]6973;testkey;folder;").dropFirst().first?.components(separatedBy: "\u{07}").first)
         XCTAssertEqual(OSC7.folder(fromPayload: osc)?.path, target.path)
         XCTAssertFalse(after.contains("builtin"), after.debugDescription)
         XCTAssertFalse(after.contains("HOOK-OUTPUT"), "hook output stays off the screen")

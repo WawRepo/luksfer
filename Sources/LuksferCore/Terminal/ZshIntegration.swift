@@ -4,10 +4,15 @@ import Foundation
 /// user's own folder in `LUKSFER_USER_ZDOTDIR` (their `ZDOTDIR`, or `$HOME`).
 ///
 /// Each file loads the user's file of the same name first, so the user's config, prompt and
-/// PATH stay as they are. `.zshrc` then adds hooks that report to Luksfer:
-/// - OSC 7 with the percent-encoded folder, before every prompt (`precmd`);
-/// - private OSC 6973 `prompt` when the line editor starts on an empty line with nothing typed
-///   ahead, `prompt-typed` when it starts with text, `exec` when a command starts.
+/// PATH stay as they are. `.zshrc` then adds hooks that report to Luksfer with private OSC 6973
+/// and the session key (`ShellReport`):
+/// - `folder` and the folder as a percent-encoded file URL, before every prompt (`precmd`);
+/// - `prompt` when the line editor starts on an empty line with nothing typed ahead,
+///   `prompt-typed` when it starts with text, `exec` when a command starts.
+///
+/// The session key is random and new for each shell. `.zshenv` moves it from the environment to a
+/// plain shell variable, so child programs never see it. Text a program prints (`cat` of a hostile
+/// file, a remote host) cannot know it, so it cannot pass as a report.
 ///
 /// The `prompt` mark comes from the line editor's `line-init` hook (zsh 5.3+), not `precmd`:
 /// `precmd` runs before the prompt is drawn, so text Luksfer types then is echoed twice.
@@ -18,8 +23,17 @@ import Foundation
 /// At the end `.zshrc` hands `ZDOTDIR` back, so `.zlogin`, `.zlogout` and child shells use the
 /// user's own files.
 public enum ZshIntegration {
-    /// The private OSC code of Luksfer's prompt marks.
+    /// The private OSC code of the shell's reports.
     public static let markCode = 6973
+
+    /// The environment variable that hands the session key to the shell.
+    public static let sessionKeyVariable = "LUKSFER_SESSION_KEY"
+
+    /// A new session key: 128 random bits in hex.
+    public static func newSessionKey() -> String {
+        var generator = SystemRandomNumberGenerator()
+        return (0..<2).map { _ in String(format: "%016llx", generator.next() as UInt64) }.joined()
+    }
 
     /// The key sequence bound to the Follow widget. No keyboard sends it.
     public static let followKey = "\u{1B}[6973~"
@@ -32,7 +46,7 @@ public enum ZshIntegration {
 
     /// File name → contents.
     public static func files() -> [String: String] {
-        [".zshenv": header + loadUserFile(".zshenv"),
+        [".zshenv": header + keepSessionKey + loadUserFile(".zshenv"),
          ".zprofile": header + loadUserFile(".zprofile"),
          ".zshrc": header + zshrc]
     }
@@ -40,6 +54,14 @@ public enum ZshIntegration {
     private static let header = """
     # Luksfer shell integration. Luksfer writes this file; edits are lost.
     # It loads your own file of the same name first.
+
+    """
+
+    /// First thing in the first file, so the user's startup files and their programs never see it.
+    private static let keepSessionKey = """
+    __luksfer_key="${\(sessionKeyVariable)-}"
+    typeset +x __luksfer_key
+    unset \(sessionKeyVariable)
 
     """
 
@@ -65,26 +87,29 @@ public enum ZshIntegration {
     # Writes straight to the terminal, past any redirect of stdout.
     __luksfer_emit() { builtin printf '%s' "$1" >|"${TTY:-/dev/tty}" 2>/dev/null }
 
-    # OSC 7: the folder as a file URL, each byte outside [A-Za-z0-9/._~-] percent-encoded.
-    __luksfer_osc7() {
+    # A report to Luksfer: OSC 6973, the session key, the report.
+    __luksfer_report() { __luksfer_emit $'\e]6973;'"${__luksfer_key-};$1"$'\a' }
+
+    # The folder as a file URL, each byte outside [A-Za-z0-9/._~-] percent-encoded.
+    __luksfer_report_folder() {
       emulate -L zsh -o extended_glob
       local LC_ALL=C
-      __luksfer_emit $'\e]7;file://'"$HOST${PWD//(#m)[^A-Za-z0-9\/._~-]/%${(l:2::0:)$(( [##16] #MATCH ))}}"$'\a'
+      __luksfer_report "folder;file://$HOST${PWD//(#m)[^A-Za-z0-9\/._~-]/%${(l:2::0:)$(( [##16] #MATCH ))}}"
     }
 
     # Line editor start: "prompt" on an empty main prompt with nothing typed ahead.
     __luksfer_line_init() {
       emulate -L zsh
       if [[ "$CONTEXT" == start && -z "$BUFFER" ]] && (( PENDING == 0 )); then
-        __luksfer_emit $'\e]6973;prompt\a'
+        __luksfer_report prompt
       else
-        __luksfer_emit $'\e]6973;prompt-typed\a'
+        __luksfer_report prompt-typed
       fi
     }
 
-    __luksfer_precmd() { __luksfer_osc7 }
-    __luksfer_preexec() { __luksfer_emit $'\e]6973;exec\a' }
-    __luksfer_prompt_fallback() { __luksfer_emit $'\e]6973;prompt\a' }
+    __luksfer_precmd() { __luksfer_report_folder }
+    __luksfer_preexec() { __luksfer_report exec }
+    __luksfer_prompt_fallback() { __luksfer_report prompt }
     # Keep typed " builtin cd -- '<folder>'" lines (the self-test types one) out of history.
     __luksfer_addhistory() { [[ "$1" != ' builtin cd -- '* ]] }
 
@@ -106,7 +131,7 @@ public enum ZshIntegration {
         done
         zle reset-prompt
       fi
-      __luksfer_emit $'\e]6973;prompt\a'
+      __luksfer_report prompt
     }
 
     __luksfer_install() {
