@@ -51,9 +51,24 @@ Win+E on Windows.
 
 1. Download `Luksfer-<version>.dmg` from the [Releases page](../../releases).
 2. Open it and drag Luksfer to Applications.
-3. The app is not notarized by Apple, so macOS blocks the first open. Open Luksfer once, then
-   go to System Settings > Privacy & Security and click **Open Anyway**. You do this only once per
-   version.
+3. Open Luksfer. The app is not notarized by Apple, so macOS blocks the first open and shows
+   "Luksfer" Not Opened. Click **Done**, not **Move to Trash**.
+4. Quit System Settings if it is open, then open it again. Go to Privacy & Security and scroll down
+   to Security.
+5. Click **Open Anyway** under "Allow applications from" and confirm with your password or Touch ID.
+   You do this only once per version.
+
+If **Open Anyway** does not appear, run this line. It removes the quarantine flag (the mark that
+makes macOS block a downloaded app) from Luksfer only, then opens the app. Run it only on a copy you
+trust; the check below shows that GitHub built your copy.
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Luksfer.app && open /Applications/Luksfer.app
+```
+
+If you replace an older version that you keep in the Dock, Finder moves the old copy to the Trash
+and the Dock icon can still point to it. Remove that icon from the Dock, open the new app, then
+right-click its icon and choose Options > Keep in Dock.
 
 To check that GitHub built your copy from this repo, use the [GitHub CLI](https://cli.github.com):
 
