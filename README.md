@@ -1,8 +1,10 @@
 <h1 align="center"><img src="docs/brand/logo.png" alt="Luksfer" width="380"></h1>
 
 Luksfer is a native macOS file explorer that works like Windows Explorer. "Luksfer" is Polish
-for a glass block, the brick that lets light through a wall. Its working name was Okno (Polish
-for "window"), so older commits use that name.
+for a glass block, the brick that lets light through a wall.
+
+We just needed something simple, without feature overload. If you need something more, feel free
+to fork it or [open an issue](../../issues).
 
 **Status:** early (version 0.1). The main features work; expect rough edges.
 
