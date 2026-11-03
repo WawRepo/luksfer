@@ -3,7 +3,15 @@
 Luksfer is a native macOS file explorer that works like Windows Explorer. "Luksfer" is Polish
 for a glass block, the brick that lets light through a wall.
 
-We just needed something simple, without feature overload. If you need something more, feel free
+I used Windows for three decades and finally moved to a Mac. Everything was fine except Finder.
+Enter renames a file instead of opening it, and right-click won't even make a new one. Explorer
+arrived with Windows 95 in 1995, so that's thirty years of habits burned in, and they're not
+going anywhere.
+
+So Claude came to the rescue. I explained how Explorer works, Claude wrote the code, and now I
+have my Explorer back.
+
+I just needed something simple, without feature overload. If you need something more, feel free
 to fork it or [open an issue](../../issues).
 
 **Status:** early (version 0.1). The main features work; expect rough edges.
