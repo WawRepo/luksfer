@@ -2,7 +2,7 @@
 # Builds the installable disk image: Luksfer-<version>.dmg (the app and a link to Applications)
 # and Luksfer-<version>.dmg.sha256, in ~/Library/Caches/luksfer-dev/release/.
 # Usage: scripts/release.sh [version]    e.g. scripts/release.sh v0.1.0
-# Without a version it uses the newest v* git tag, else 0.1.0. The app is signed ad hoc unless
+# Without a version it uses the newest v* git tag, else 0.2.0. The app is signed ad hoc unless
 # LUKSFER_SIGN_IDENTITY names a certificate.
 # For a public release, set LUKSFER_SIGN_IDENTITY to a "Developer ID Application" certificate and
 # LUKSFER_NOTARY_PROFILE to a profile made with `xcrun notarytool store-credentials`. The script
@@ -10,7 +10,7 @@
 # so macOS opens the app with no warning.
 set -eu
 root="${0:A:h:h}"
-tag="${1:-$(git -C "$root" describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo 0.1.0)}"
+tag="${1:-$(git -C "$root" describe --tags --match 'v[0-9]*' --abbrev=0 2>/dev/null || echo 0.2.0)}"
 version="${tag#v}"
 if [[ ! "$version" =~ '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$' ]]; then
   echo "release.sh: \"$tag\" is not a version like v0.1.0" >&2
