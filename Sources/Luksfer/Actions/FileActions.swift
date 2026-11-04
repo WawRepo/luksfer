@@ -121,7 +121,7 @@ final class FileActions {
                 } catch {
                     window.showError(error)
                 }
-                window.panes.forEach { $0.reload() }
+                window.panes.forEach { $0.list.reload() }
             }
         }
     }
@@ -238,7 +238,7 @@ final class FileActions {
                 then?()
             } catch let error as FileOperationError {
                 if let partial = error.partialChange { self.record(partial) }
-                window.panes.forEach { $0.reload() }
+                window.panes.forEach { $0.list.reload() }
                 if case .cancelled = error {} else { window.showError(error) }
             } catch {
                 window.showError(error)
@@ -313,6 +313,12 @@ final class FileActions {
     private func reloadPanes(in window: BrowserWindowController, showing folders: Set<URL>, select: [URL]) {
         let paths = Set(folders.map { $0.standardizedFileURL.path })
         for pane in window.panes {
+            if let root = pane.list.resultsRoot {
+                // Search results come from many folders, so any change can touch them.
+                let picks = select.filter { FolderSearch.isInside($0, folder: root) }
+                pane.list.reload(select: picks.isEmpty ? nil : picks)
+                continue
+            }
             let shown = paths.contains(pane.folder.standardizedFileURL.path)
             let picks = select.filter { $0.deletingLastPathComponent().standardizedFileURL.path == pane.folder.standardizedFileURL.path }
             if shown || !picks.isEmpty { pane.list.reload(select: picks.isEmpty ? nil : picks) }

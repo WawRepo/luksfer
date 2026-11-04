@@ -8,6 +8,7 @@
 // Every write goes to ~/Library/Caches/luksfer-dev/sandbox/. Real folders are only read.
 
 import AppKit
+import LuksferCore
 import SwiftTerm
 import UniformTypeIdentifiers
 
@@ -413,6 +414,57 @@ func runDrive(_ folder: String) throws {
     print(datalessBefore.count == stillDataless ? "RESULT: no download started" : "RESULT: SOMETHING WAS DOWNLOADED")
 }
 
+// MARK: - search
+
+/// Searches a real folder and its subfolders, as the search box does, and checks that nothing
+/// downloaded: everything only in the cloud stays so, and the local disk use stays the same. It
+/// only reads. Names are never printed. A run lists the whole tree: run it through scripts/heavy.sh.
+func runSearch(_ folder: String) throws {
+    let root = URL(fileURLWithPath: (folder as NSString).expandingTildeInPath, isDirectory: true)
+    // The app's own process rule, so this count cannot download either.
+    setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS, IOPOL_MATERIALIZE_DATALESS_FILES_OFF)
+
+    func survey() -> (items: Int, blocks: Int64, cloudOnly: [String], cloudFolders: Int) {
+        var items = 0, blocks: Int64 = 0, cloudOnly: [String] = [], cloudFolders = 0
+        var stack = [root.path]
+        while let dir = stack.popLast() {
+            guard let names = try? FileManager.default.contentsOfDirectory(atPath: dir) else { continue }
+            for name in names {
+                let path = dir + "/" + name
+                var st = stat()
+                guard lstat(path, &st) == 0 else { continue }
+                items += 1
+                blocks += Int64(st.st_blocks)
+                let isFolder = (st.st_mode & S_IFMT) == S_IFDIR
+                if (st.st_flags & SF_DATALESS_FLAG) != 0 {
+                    cloudOnly.append(path)
+                    if isFolder { cloudFolders += 1 }
+                } else if isFolder {
+                    stack.append(path)
+                }
+            }
+        }
+        return (items, blocks, cloudOnly, cloudFolders)
+    }
+
+    let before = survey()
+    print("before: \(before.items) items, \(before.blocks) local blocks, \(before.cloudOnly.count) only in the cloud (\(before.cloudFolders) folders)")
+    // A common letter gives many results; a word no file has walks without results.
+    for query in ["e", "zzqx-no-file-has-this-name"] {
+        var found = 0, batches = 0
+        let t0 = now()
+        let stats = FolderSearch(root: root, query: query, includeHidden: true).run { batch, _ in
+            found += batch.count
+            batches += 1
+        }
+        print("search \(query.count == 1 ? "(common letter)" : "(no match)"): \(found) results in \(batches) batches, \(ms(now() - t0)), folders searched \(stats.foldersSearched), skipped: \(stats.cloudOnlyFolders) only in the cloud, \(stats.unreadableFolders) not readable, \(stats.otherVolumes) other disks, limit reached: \(stats.reachedLimit)")
+    }
+    let after = survey()
+    let still = before.cloudOnly.filter(isDataless).count
+    print("after: \(after.items) items, \(after.blocks) local blocks, \(after.cloudOnly.count) only in the cloud; of the first count \(still) are still only in the cloud")
+    print(still == before.cloudOnly.count && after.blocks <= before.blocks ? "RESULT: no download started" : "RESULT: SOMETHING CHANGED, check for a download")
+}
+
 // MARK: - term
 
 @MainActor final class TermCheck: NSObject, LocalProcessTerminalViewDelegate {
@@ -600,10 +652,13 @@ do {
     case "drive":
         guard args.count >= 2 else { print("usage: LuksferSpike drive <folder>"); exit(2) }
         try runDrive(args[args.startIndex + 1])
+    case "search":
+        guard args.count >= 2 else { print("usage: LuksferSpike search <folder>"); exit(2) }
+        try runSearch(args[args.startIndex + 1])
     case "term": try runTerm()
     case "pasteboard": try runPasteboard()
     default:
-        print("usage: LuksferSpike list10k | drive <folder> | term | pasteboard")
+        print("usage: LuksferSpike list10k | drive <folder> | search <folder> | term | pasteboard")
         exit(2)
     }
 } catch {

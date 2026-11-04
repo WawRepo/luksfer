@@ -26,6 +26,9 @@ final class FileListViewController: NSViewController {
     private(set) var loadError: Error?
     /// The listing of a newly opened folder has not arrived yet.
     private(set) var isLoading = false
+    /// The folder a search looked in, while the list shows its results. Nil while it shows a folder.
+    private(set) var resultsRoot: URL?
+    var isShowingResults: Bool { resultsRoot != nil }
     /// Self-test only: every listing takes this many seconds longer (a slow folder).
     static var listDelayForTests: TimeInterval = 0
     var sortOrder = FileSortOrder() {
@@ -85,7 +88,9 @@ final class FileListViewController: NSViewController {
 
     private func setUpColumns() {
         let saved = AppServices.shared.settings.columns
-        let order = saved.isEmpty ? FileColumn.allCases : saved.compactMap { FileColumn(rawValue: $0.id) } + FileColumn.allCases.filter { c in !saved.contains { $0.id == c.rawValue } }
+        var order = saved.isEmpty ? FileColumn.allCases : saved.compactMap { FileColumn(rawValue: $0.id) } + FileColumn.allCases.filter { c in !saved.contains { $0.id == c.rawValue } }
+        order.removeAll { $0 == .folder }
+        order.insert(.folder, at: (order.firstIndex(of: .name) ?? -1) + 1)
         for column in order {
             let state = saved.first { $0.id == column.rawValue }
             let c = NSTableColumn(identifier: column.identifier)
@@ -93,7 +98,7 @@ final class FileListViewController: NSViewController {
             c.width = state.map { CGFloat($0.width) } ?? column.defaultWidth
             c.minWidth = column == .name ? 120 : 40
             c.isHidden = column == .name ? false : (state?.hidden ?? column.hiddenByDefault)
-            c.sortDescriptorPrototype = NSSortDescriptor(key: column.rawValue, ascending: true)
+            if column != .folder { c.sortDescriptorPrototype = NSSortDescriptor(key: column.rawValue, ascending: true) }
             if column == .size { c.headerCell.alignment = .right }
             tableView.addTableColumn(c)
         }
@@ -115,8 +120,21 @@ final class FileListViewController: NSViewController {
         // The table's own column edges include its spacing and insets.
         let right = tableView.tableColumns.indices.filter { !tableView.tableColumns[$0].isHidden }
             .map { tableView.rect(ofColumn: $0).maxX }.max() ?? 0
-        let width = max(name.minWidth, floor(name.width - (right - scrollView.contentView.bounds.width)))
+        // Results from many folders can have long names, and a cut-off name makes two rows look the
+        // same. So Name stays wide enough to read; the columns on the right can scroll.
+        let least = isShowingResults ? max(name.minWidth, 200) : name.minWidth
+        let width = max(least, floor(name.width - (right - scrollView.contentView.bounds.width)))
         if abs(name.width - width) > 0.5 { name.width = width }
+    }
+
+    /// Gives the Folder column a share of the width the other columns leave. In a narrow pane Name
+    /// comes first. It runs once per set of results, so a width the user sets stays.
+    private func fitFolderColumn() {
+        guard let folder = tableView.tableColumn(withIdentifier: FileColumn.folder.identifier) else { return }
+        let others = tableView.tableColumns.filter { !$0.isHidden && $0 !== folder && $0.identifier != FileColumn.name.identifier }
+            .reduce(CGFloat(0)) { $0 + $1.width + tableView.intercellSpacing.width }
+        let free = scrollView.contentView.bounds.width - others
+        folder.width = max(100, min(FileColumn.folder.defaultWidth, floor(free * 0.4)))
     }
 
     @objc private func clipViewResized(_ note: Notification) { fitNameColumn() }
@@ -124,7 +142,8 @@ final class FileListViewController: NSViewController {
     @objc private func columnsChanged(_ note: Notification) {
         // A user resizing Name keeps that width until the pane changes size.
         if (note.userInfo?["NSTableColumn"] as? NSTableColumn)?.identifier != FileColumn.name.identifier { fitNameColumn() }
-        let states = tableView.tableColumns.map { ColumnState(id: $0.identifier.rawValue, width: Double($0.width), hidden: $0.isHidden) }
+        let states = tableView.tableColumns.filter { $0.identifier != FileColumn.folder.identifier }
+            .map { ColumnState(id: $0.identifier.rawValue, width: Double($0.width), hidden: $0.isHidden) }
         AppServices.shared.update { $0.columns = states }
     }
 
@@ -201,7 +220,65 @@ final class FileListViewController: NSViewController {
     func reload(select: [URL]? = nil, then: (() -> Void)? = nil) {
         guard let folder else { return }
         if let then { onLoaded.append(then) }
-        load(folder, select: select)
+        if isShowingResults { refreshResults(select: select) } else { load(folder, select: select) }
+    }
+
+    // MARK: Search results
+
+    /// Empties the list for the results of a search in `root`. A listing on its way must not
+    /// replace them. The results stay until `endResults`.
+    func showResults(under root: URL) {
+        generation += 1
+        isLoading = false
+        loadError = nil
+        if !isShowingResults {
+            tableView.tableColumn(withIdentifier: FileColumn.folder.identifier)?.isHidden = false
+            fitFolderColumn()
+        }
+        resultsRoot = root
+        allItems = []
+        filterQuery = ""
+        tableView.deselectAll(nil)
+        applyItems(keepSelection: false)
+        tableView.scrollRowToVisible(0)
+        fitNameColumn()
+    }
+
+    func addResults(_ found: [FileItem]) {
+        guard isShowingResults, !found.isEmpty else { return }
+        allItems += found
+        applyItems(keepSelection: true)
+    }
+
+    /// Goes back to showing a folder. The caller loads the folder.
+    func endResults() {
+        guard isShowingResults else { return }
+        resultsRoot = nil
+        tableView.tableColumn(withIdentifier: FileColumn.folder.identifier)?.isHidden = true
+        fitNameColumn()
+    }
+
+    /// After a file action or a change in the folder: reads each result's metadata again, without a
+    /// new search. Results that went away go. `select` adds items a file action made (a new name, a
+    /// paste), and selects them.
+    private func refreshResults(select: [URL]?) {
+        let gen = generation
+        let shown = allItems.map(\.url)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let paths = Set(shown.map(\.path))
+            let fresh = shown.compactMap { DirectoryReader.item(at: $0) }
+            let added = (select ?? []).filter { !paths.contains($0.path) }.compactMap { DirectoryReader.item(at: $0) }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, gen == self.generation, self.isShowingResults else { return }
+                let foundMeanwhile = self.allItems.filter { !paths.contains($0.url.path) }
+                self.allItems = fresh + added + foundMeanwhile
+                self.applyItems(keepSelection: select == nil)
+                if let select { self.select(select, scroll: true) }
+                let pending = self.onLoaded
+                self.onLoaded = []
+                pending.forEach { $0() }
+            }
+        }
     }
 
     private func applyItems(keepSelection: Bool) {
@@ -335,6 +412,7 @@ extension FileListViewController: NSTableViewDataSource, NSTableViewDelegate {
         let cell = tableView.makeView(withIdentifier: tableColumn.identifier, owner: self) as? TextCellView ?? {
             let c = TextCellView(alignment: column == .size ? .right : .left)
             c.identifier = tableColumn.identifier
+            if column == .folder { c.label.lineBreakMode = .byTruncatingHead }   // the end of a path says the most
             return c
         }()
         switch column {
@@ -343,6 +421,9 @@ extension FileListViewController: NSTableViewDataSource, NSTableViewDelegate {
         case .type: cell.label.stringValue = FileTypes.displayName(for: item)
         case .size: cell.label.stringValue = item.isFolder || item.isPackage ? "" : Formatters.size(item.size)
         case .fileExtension: cell.label.stringValue = item.fileExtension
+        case .folder:
+            cell.label.stringValue = resultsRoot.map { FolderSearch.location(of: item.url, under: $0) } ?? ""
+            cell.label.toolTip = item.url.deletingLastPathComponent().path
         case .name: break
         }
         return cell
@@ -436,7 +517,7 @@ extension FileListViewController: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         for column in tableView.tableColumns {
-            guard column.identifier != FileColumn.name.identifier else { continue }
+            guard column.identifier != FileColumn.name.identifier, column.identifier != FileColumn.folder.identifier else { continue }
             let item = NSMenuItem(title: column.title, action: #selector(toggleColumn), keyEquivalent: "")
             item.target = self
             item.representedObject = column.identifier.rawValue

@@ -98,8 +98,14 @@ inside the window. It is the app you open for everyday file work instead of Find
 - Folders autocomplete. Tab completes, Enter goes, Esc cancels. A wrong path shows a clear message.
 - Type `term`, `terminal` or `cmd` to open the terminal in this folder (the Windows `cmd` habit).
 - Copy Path: a button, ⌥⌘C, and the context menu.
-- A search box per pane (⌘F) filters the current folder as you type. *(planned)* Enter also searches
-  subfolders.
+- A search box per pane (⌘F) filters the current folder as you type. Enter also searches the
+  subfolders. Results come in as Luksfer finds them, with a Folder column that says where each one
+  is, and every file action works on them. Stop ends the search and keeps the results. Esc, Back or
+  new text returns to the folder. "Open Containing Folder" on the context menu goes to the result's
+  folder.
+- The search matches names only. It does not follow links, open packages (`.app`) or enter another
+  disk or network drive inside the folder. It stops at 20,000 results. It never opens a folder whose
+  list is only in the cloud, and the status bar counts the folders it did not search.
 
 ### 5.4 Sidebar
 
@@ -169,7 +175,8 @@ inside the window. It is the app you open for everyday file work instead of Find
 ### 5.9 Cloud folders and slow volumes
 
 - Cloud folders (Google Drive and other macOS File Provider folders) list without downloading file
-  contents. An icon shows "only in the cloud". Listing, sizes and icons never start a download.
+  contents. An icon shows "only in the cloud". Listing, searching, sizes and icons never start a
+  download.
 - Slow folders (cloud, network) load in the background. The window never freezes; the pane shows that
   it is loading, and the old rows go away so nothing acts on the old folder.
 - A network server that goes away never freezes the sidebar: Luksfer reads the mount table without

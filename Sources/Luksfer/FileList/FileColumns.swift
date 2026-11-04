@@ -1,9 +1,10 @@
 import AppKit
 import LuksferCore
 
-/// The details-view columns (PRD §6.2). Name, Date modified, Type and Size show by default.
+/// The details-view columns (PRD §6.2). Name, Date modified, Type and Size show by default. Folder
+/// shows only with search results: it is not in the header's menu, and it is never saved.
 enum FileColumn: String, CaseIterable {
-    case name, modified, type, size, created, fileExtension
+    case name, modified, type, size, created, fileExtension, folder
 
     var title: String {
         switch self {
@@ -13,6 +14,7 @@ enum FileColumn: String, CaseIterable {
         case .size: return "Size"
         case .created: return "Date created"
         case .fileExtension: return "Extension"
+        case .folder: return "Folder"
         }
     }
 
@@ -23,14 +25,15 @@ enum FileColumn: String, CaseIterable {
         case .type: return 130
         case .size: return 70
         case .fileExtension: return 70
+        case .folder: return 220
         }
     }
 
-    var hiddenByDefault: Bool { self == .created || self == .fileExtension }
+    var hiddenByDefault: Bool { self == .created || self == .fileExtension || self == .folder }
 
     var sortKey: SortKey {
         switch self {
-        case .name: return .name
+        case .name, .folder: return .name   // Folder has no sort of its own
         case .modified: return .modified
         case .type: return .type
         case .size: return .size

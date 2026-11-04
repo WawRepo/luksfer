@@ -15,11 +15,21 @@ public enum DirectoryReader {
         let previous = getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD)
         setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, IOPOL_MATERIALIZE_DATALESS_FILES_ON)
         defer { setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_THREAD, previous >= 0 ? previous : IOPOL_MATERIALIZE_DATALESS_FILES_DEFAULT) }
+        var items: [FileItem] = []
+        try forEachEntry(in: folder, includeHidden: includeHidden) { item, _ in
+            items.append(item)
+            return true
+        }
+        return items
+    }
+
+    /// Calls `body` with each entry of a folder and its `stat`, until `body` returns false. It keeps
+    /// the thread's download policy as it is.
+    static func forEachEntry(in folder: URL, includeHidden: Bool, _ body: (FileItem, stat) -> Bool) throws {
         let path = folder.path
         guard let dir = opendir(path) else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         defer { closedir(dir) }
         let fd = dirfd(dir)
-        var items: [FileItem] = []
         while let entry = readdir(dir) {
             let name = withUnsafePointer(to: entry.pointee.d_name) {
                 $0.withMemoryRebound(to: CChar.self, capacity: Int(MAXNAMLEN) + 1) { String(cString: $0) }
@@ -29,9 +39,8 @@ public enum DirectoryReader {
             guard fstatat(fd, name, &st, AT_SYMLINK_NOFOLLOW) == 0 else { continue }
             let hidden = name.hasPrefix(".") || (st.st_flags & UInt32(UF_HIDDEN)) != 0
             if hidden && !includeHidden { continue }
-            items.append(item(named: name, in: folder, stat: st, dirFD: fd, hidden: hidden))
+            if !body(item(named: name, in: folder, stat: st, dirFD: fd, hidden: hidden), st) { return }
         }
-        return items
     }
 
     /// Metadata for one path (used after a rename or a new item, and by tests).

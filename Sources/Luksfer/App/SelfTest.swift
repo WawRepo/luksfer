@@ -38,6 +38,162 @@ enum SelfTest {
 
     private static func wait(_ seconds: Double = 0.6) async { try? await Task.sleep(for: .seconds(seconds)) }
 
+    /// Enter in the search box searches the subfolders too (PRD §5.3).
+    private static func subfolderSearch(in folder: URL, window w: BrowserWindowController) async {
+        let pane = w.activePane
+        let table = pane.list.tableView
+        let fm = FileManager.default
+        let box = folder.appendingPathComponent("search-box", isDirectory: true)
+        let inner = box.appendingPathComponent("deep/inner", isDirectory: true)
+        try? fm.createDirectory(at: inner, withIntermediateDirectories: true)
+        let top = box.appendingPathComponent("needle-top.txt")
+        let deep = inner.appendingPathComponent("needle-deep.txt")
+        let renamed = inner.appendingPathComponent("needle-renamed.txt")
+        for url in [top, deep, box.appendingPathComponent("other.txt"), inner.appendingPathComponent("plain.txt")] {
+            fm.createFile(atPath: url.path, contents: nil)
+        }
+        pane.navigate(to: box)
+        await wait()
+        pane.list.focus()
+
+        func type(_ text: String) {
+            pane.searchField.stringValue = text
+            _ = pane.searchField.sendAction(pane.searchField.action, to: pane.searchField.target)
+        }
+        func press(_ selector: Selector) { _ = pane.control(pane.searchField, textView: NSTextView(), doCommandBy: selector) }
+        let enter = #selector(NSResponder.insertNewline(_:)), esc = #selector(NSResponder.cancelOperation(_:))
+        func shown() -> Set<String> { Set(pane.list.items.map(\.name)) }
+        func search() async {
+            type("needle")
+            press(enter)
+            _ = await waitFor(5) { !pane.isSearching && !pane.list.items.isEmpty }
+        }
+        let column = table.tableColumn(withIdentifier: FileColumn.folder.identifier)
+        let plain: Set<String> = ["deep", "needle-top.txt", "other.txt"]
+
+        check("search: the Folder column is hidden in a plain folder", column?.isHidden == true)
+        type("needle")
+        check("search: typing filters only this folder", shown() == ["needle-top.txt"])
+        press(enter)
+        check("search: Enter starts the results at once", pane.list.isShowingResults)
+        pane.view.layoutSubtreeIfNeeded()
+        pane.view.display()
+        DevHooks.snapshot(to: folder.deletingLastPathComponent().appendingPathComponent("selftest-searching.png"))
+        _ = await waitFor(5) { !pane.isSearching && pane.list.items.count == 2 }
+        await wait(0.2)
+        DevHooks.snapshot(to: folder.deletingLastPathComponent().appendingPathComponent("selftest-results.png"))
+        check("search: Enter also finds items in subfolders", shown() == ["needle-top.txt", "needle-deep.txt"])
+        check("search: results show the Folder column", column?.isHidden == false)
+        check("search: Name stays wide enough to read", (table.tableColumn(withIdentifier: FileColumn.name.identifier)?.width ?? 0) >= 200)
+        if let row = pane.list.items.firstIndex(where: { $0.name == "needle-deep.txt" }),
+           let index = table.tableColumns.firstIndex(where: { $0 === column }) {
+            let cell = table.view(atColumn: index, row: row, makeIfNecessary: true) as? TextCellView
+            check("search: the Folder column shows where a result is", cell?.label.stringValue == "search-box/deep/inner")
+        } else {
+            check("search: the Folder column shows where a result is", false)
+        }
+        let status = w.statusBar.infoLabel.stringValue
+        check("search: the status bar counts the results", status.hasPrefix("2 items found") && !status.contains("searching"))
+        check("search: Back is on with results, also with no history", pane.canGoBack)
+        column?.width += 10
+        await wait(0.2)
+        check("search: the Folder column is never saved", !AppServices.shared.settings.columns.contains { $0.id == FileColumn.folder.rawValue })
+        check("search: a sort by name still marks the Name column", FileColumn(sortKey: .name) == .name)
+
+        guard let found = pane.list.items.first(where: { $0.name == "needle-deep.txt" }) else { return }
+        w.pane(pane, rename: found, to: renamed.lastPathComponent)
+        await settle()
+        check("search: rename works on a result in a subfolder", fm.fileExists(atPath: renamed.path) && !fm.fileExists(atPath: deep.path)
+              && shown() == ["needle-top.txt", "needle-renamed.txt"] && pane.list.isShowingResults)
+        AppServices.shared.undoManager.undo()
+        await settle()
+        check("search: undo of the rename shows the old name", fm.fileExists(atPath: deep.path) && shown() == ["needle-top.txt", "needle-deep.txt"])
+        pane.list.select([deep], scroll: false)
+        w.moveToTrash(nil)
+        await settle()
+        check("search: Trash works on a result in a subfolder", !fm.fileExists(atPath: deep.path) && shown() == ["needle-top.txt"])
+        AppServices.shared.undoManager.undo()
+        await settle()
+        check("search: undo of the Trash brings the result back", fm.fileExists(atPath: deep.path) && shown() == ["needle-top.txt", "needle-deep.txt"])
+
+        pane.list.select([deep], scroll: false)
+        w.openContainingFolder(nil)
+        await wait()
+        check("search: Open Containing Folder opens the folder and selects the item", pane.folder.standardizedFileURL == inner.standardizedFileURL
+              && pane.list.selectedURLs.map(\.lastPathComponent) == [deep.lastPathComponent])
+        check("search: another folder ends the results", !pane.list.isShowingResults && column?.isHidden == true && pane.searchField.stringValue.isEmpty)
+        pane.goBack()
+        await wait()
+        check("search: Back returns to the searched folder", pane.folder.standardizedFileURL == box.standardizedFileURL && shown() == plain)
+
+        await search()
+        pane.list.focus()
+        key(0x1B, to: table)
+        await wait()
+        check("search: Esc in the list returns to the folder", !pane.list.isShowingResults && shown() == plain
+              && pane.searchField.stringValue.isEmpty && column?.isHidden == true)
+
+        await search()
+        pane.goBack()
+        await wait()
+        check("search: Back leaves the results and stays in the folder", !pane.list.isShowingResults && shown() == plain
+              && pane.folder.standardizedFileURL == box.standardizedFileURL)
+
+        await search()
+        press(esc)
+        await wait()
+        check("search: Esc in the box returns to the folder", !pane.list.isShowingResults && shown() == plain && pane.searchField.stringValue.isEmpty)
+
+        await search()
+        type("needle-t")
+        await wait()
+        check("search: new text leaves the results and filters the folder", !pane.list.isShowingResults && shown() == ["needle-top.txt"])
+        press(esc)
+        await wait()
+
+        await search()
+        _ = pane.searchField.sendAction(pane.searchField.action, to: pane.searchField.target)
+        check("search: the box ending its edit keeps the results", pane.list.isShowingResults)
+        pane.list.reload()
+        await wait()
+        check("search: a change in the folder keeps the results", pane.list.isShowingResults && shown().contains("needle-deep.txt"))
+        let hidden = inner.appendingPathComponent(".needle-hidden")
+        fm.createFile(atPath: hidden.path, contents: nil)
+        w.toggleHiddenFiles(nil)
+        _ = await waitFor(5) { !pane.isSearching && shown().contains(hidden.lastPathComponent) }
+        check("search: Show Hidden Files searches again", shown().contains(hidden.lastPathComponent))
+        w.toggleHiddenFiles(nil)
+        _ = await waitFor(5) { !pane.isSearching && !shown().contains(hidden.lastPathComponent) }
+        check("search: hidden items go again", pane.list.isShowingResults && !shown().contains(hidden.lastPathComponent))
+        press(esc)
+        await wait()
+
+        type("needle")
+        press(enter)
+        pane.stopSearch()
+        check("search: Stop ends the search and keeps the results", !pane.isSearching && pane.list.isShowingResults)
+        press(esc)
+        await wait()
+
+        type("no-such-name")
+        await wait(0.2)
+        press(enter)
+        _ = await waitFor(5) { !pane.isSearching }
+        check("search: no results is not an error", pane.list.isShowingResults && pane.list.items.isEmpty)
+        press(esc)
+        await wait()
+        type("   ")
+        press(enter)
+        check("search: only spaces start no search", !pane.list.isShowingResults)
+        press(esc)
+        await wait()
+
+        pane.navigate(to: folder)
+        await wait()
+        try? fm.removeItem(at: box)
+        await wait()
+    }
+
     /// Waits until file jobs and undos have finished (up to 15 s), then lets the lists reload.
     private static func settle() async {
         _ = await waitFor(15) { !FileActions.shared.isBusy }
@@ -755,6 +911,7 @@ enum SelfTest {
         await questions(in: folder, window: w)
         await navigation(in: folder, window: w)
         await drops(in: folder, window: w)
+        await subfolderSearch(in: folder, window: w)
         await compressOddNames(in: folder, window: w)
         await newWindow()
         await comeBack(in: folder, window: w)

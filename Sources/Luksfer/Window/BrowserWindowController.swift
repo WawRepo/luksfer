@@ -202,7 +202,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let count = list.items.count
         let selected = list.selectedItems
         var text = count == 1 ? "1 item" : "\(count) items"
-        if !list.filterQuery.isEmpty { text += " found" }
+        if let search = activePane.searchStatus { text += search } else if !list.filterQuery.isEmpty { text += " found" }
+        statusBar.infoLabel.toolTip = activePane.searchStatusDetail
         if !selected.isEmpty {
             let bytes = selected.filter { !$0.isFolder }.reduce(Int64(0)) { $0 + $1.size }
             text += " · \(selected.count) selected"

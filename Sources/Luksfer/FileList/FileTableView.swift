@@ -10,6 +10,7 @@ enum ListKey {
     case deleteNow       // ⇧Del
     case quickLook       // Space
     case switchPane      // Tab
+    case cancel          // Esc
 }
 
 protocol FileTableViewDelegate: AnyObject {
@@ -47,6 +48,8 @@ final class FileTableView: NSTableView {
             return .quickLook
         case NSTabCharacter, NSBackTabCharacter:
             return flags.subtracting(.shift).isEmpty ? .switchPane : nil
+        case 0x1B where flags.isEmpty:
+            return .cancel
         default:
             return nil
         }

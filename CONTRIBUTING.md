@@ -46,6 +46,10 @@ scripts/build-app.sh                  # ~/Library/Caches/luksfer-dev/dist/Luksfe
 scripts/readme-shots.sh               # the README screenshots, with made-up files in a sandbox
 ```
 
+A test cannot make a folder that is only in the cloud. To check that the search starts no download, run
+`LuksferSpike search <folder>` on a real cloud folder, through `scripts/heavy.sh`. It only reads, and
+it prints counts, never names.
+
 Build output goes to `~/Library/Caches/luksfer-dev/`, never into the repo. The scripts run one
 heavy job (build or test run) at a time through `scripts/heavy.sh`.
 

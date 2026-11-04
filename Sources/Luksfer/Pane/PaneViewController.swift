@@ -36,8 +36,21 @@ final class PaneViewController: NSViewController {
     private let messageLabel = NSTextField(wrappingLabelWithString: "")
     private let messageButton = NSButton(title: "Open Privacy Settings", target: nil, action: nil)
     private var spinnerWork: DispatchWorkItem?
+    private let stopSearchButton = NSButton(title: "Stop", target: nil, action: nil)
+    /// The subfolder search that walks the disk now.
+    private var search: FolderSearch?
+    private var resultsQuery = ""
+    private var searchStats = FolderSearch.Stats()
+    private var searchStopped = false
+    private var selectFirstResult = false
 
     var folder: URL { history.current }
+
+    /// A subfolder search walks the disk now.
+    var isSearching: Bool { search != nil }
+
+    /// Back also leaves search results, which are not a step in the history.
+    var canGoBack: Bool { list.isShowingResults || history.canGoBack }
 
     var isActive = false { didSet { updateActiveLook() } }
 
@@ -59,6 +72,8 @@ final class PaneViewController: NSViewController {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    deinit { search?.cancel() }
 
     override func loadView() {
         let root = NSView()
@@ -89,13 +104,22 @@ final class PaneViewController: NSViewController {
         searchField.translatesAutoresizingMaskIntoConstraints = false
         searchField.controlSize = .regular
         searchField.setAccessibilityLabel("Search this folder")
+        searchField.toolTip = "Type to filter this folder. Press Enter to search its subfolders too."
 
         spinner.style = .spinning
         spinner.controlSize = .small
         spinner.isDisplayedWhenStopped = false
         spinner.translatesAutoresizingMaskIntoConstraints = false
 
-        let row = NSStackView(views: [backButton, forwardButton, upButton, pathBar, copyPathButton, spinner, searchField])
+        stopSearchButton.target = self
+        stopSearchButton.action = #selector(stopSearch)
+        stopSearchButton.controlSize = .small
+        stopSearchButton.bezelStyle = .push
+        stopSearchButton.toolTip = "Stop searching"
+        stopSearchButton.setAccessibilityLabel("Stop searching")
+        stopSearchButton.isHidden = true
+
+        let row = NSStackView(views: [backButton, forwardButton, upButton, pathBar, copyPathButton, spinner, stopSearchButton, searchField])
         row.orientation = .horizontal
         row.spacing = 4
         row.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
@@ -212,7 +236,12 @@ final class PaneViewController: NSViewController {
         show(target, select: select)
     }
 
-    @objc func goBack() { let from = folder; if let url = history.goBack() { show(url, select: cameFrom(from, into: url)) } }
+    @objc func goBack() {
+        if list.isShowingResults { leaveResults(); return }
+        let from = folder
+        if let url = history.goBack() { show(url, select: cameFrom(from, into: url)) }
+    }
+
     @objc func goForward() { let from = folder; if let url = history.goForward() { show(url, select: cameFrom(from, into: url)) } }
 
     /// Going back to a parent selects the folder you came from (like Explorer).
@@ -228,11 +257,13 @@ final class PaneViewController: NSViewController {
 
     func reload() {
         pathBar.showsHiddenFolders = AppServices.shared.settings.showHidden
-        list.reload()
+        // ⌘R or a change of Show Hidden Files: search again.
+        if list.isShowingResults { searchSubfolders() } else { list.reload() }
     }
 
     private func show(_ url: URL, select: [URL]?) {
         guard isViewLoaded else { return }
+        endSearch()
         pathBar.folder = url
         pathBar.showsHiddenFolders = AppServices.shared.settings.showHidden
         updateButtons()
@@ -264,7 +295,7 @@ final class PaneViewController: NSViewController {
     }
 
     private func updateButtons() {
-        backButton.isEnabled = history.canGoBack
+        backButton.isEnabled = canGoBack
         forwardButton.isEnabled = history.canGoForward
         upButton.isEnabled = !folder.isRootFolder
     }
@@ -274,9 +305,17 @@ final class PaneViewController: NSViewController {
         guard isViewLoaded, list.loadError == nil else { return }
         guard list.items.isEmpty else { messageBox.isHidden = true; return }
         let query = searchField.stringValue
-        messageLabel.stringValue = list.isLoading ? "Loading…"
-            : query.isEmpty ? "This folder is empty.\nRight-click to add a folder or a file."
-            : "Nothing here matches “\(query)”."
+        if list.isShowingResults {
+            var text = isSearching ? "Searching subfolders…"
+                : searchStopped ? "Stopped. Nothing found yet for “\(query)”."
+                : "Nothing in this folder or its subfolders matches “\(query)”."
+            if !isSearching, let skipped = notSearchedText { text += "\n\(skipped.prefix(1).uppercased() + skipped.dropFirst())." }
+            messageLabel.stringValue = text
+        } else {
+            messageLabel.stringValue = list.isLoading ? "Loading…"
+                : query.isEmpty ? "This folder is empty.\nRight-click to add a folder or a file."
+                : "Nothing here matches “\(query)”.\nPress Enter to search the subfolders too."
+        }
         messageButton.isHidden = true
         messageBox.isHidden = false
     }
@@ -320,7 +359,122 @@ final class PaneViewController: NSViewController {
 
     func focusSearch() { view.window?.makeFirstResponder(searchField) }
 
-    @objc private func searchChanged() { list.filterQuery = searchField.stringValue }
+    @objc private func searchChanged() {
+        let text = searchField.stringValue
+        if list.isShowingResults {
+            guard text != resultsQuery else { return }   // the field ended editing; the text is the same
+            leaveResults(clearText: false)
+        }
+        list.filterQuery = text
+    }
+
+    // MARK: Subfolder search
+
+    /// Enter in the search box: finds the typed words in this folder and all its subfolders. The
+    /// results replace the rows until Esc, Back, another folder or a change to the text.
+    func searchSubfolders() {
+        let query = searchField.stringValue
+        guard !ListFilter.words(in: query).isEmpty, list.loadError == nil else { return }
+        search?.cancel()
+        let search = FolderSearch(root: folder, query: query, includeHidden: AppServices.shared.settings.showHidden)
+        self.search = search
+        resultsQuery = query
+        searchStats = FolderSearch.Stats()
+        searchStopped = false
+        selectFirstResult = true
+        spinnerWork?.cancel()
+        spinner.startAnimation(nil)
+        stopSearchButton.isHidden = false
+        list.showResults(under: folder)
+        updateButtons()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let stats = search.run { batch, stats in
+                DispatchQueue.main.async { self?.searchFound(batch, stats, by: search) }
+            }
+            DispatchQueue.main.async { self?.searchEnded(stats, by: search) }
+        }
+    }
+
+    private func searchFound(_ batch: [FileItem], _ stats: FolderSearch.Stats, by search: FolderSearch) {
+        guard search === self.search else { return }
+        searchStats = stats
+        list.addResults(batch)
+        if selectFirstResult, !list.items.isEmpty {
+            selectFirstResult = false
+            if view.window?.firstResponder === list.tableView, list.tableView.selectedRow < 0 {
+                list.tableView.selectRowIndexes([0], byExtendingSelection: false)
+            }
+        }
+    }
+
+    private func searchEnded(_ stats: FolderSearch.Stats, by search: FolderSearch) {
+        guard search === self.search else { return }
+        searchStats = stats
+        searchNoLongerRuns()
+    }
+
+    /// The Stop button: the search ends and the results so far stay.
+    @objc func stopSearch() {
+        guard let search else { return }
+        search.cancel()
+        searchStopped = true
+        searchNoLongerRuns()
+    }
+
+    private func searchNoLongerRuns() {
+        search = nil
+        spinner.stopAnimation(nil)
+        stopSearchButton.isHidden = true
+        updateMessage()
+        delegate?.paneSelectionDidChange(self)
+    }
+
+    /// Ends a search and its results. The caller shows a folder next.
+    private func endSearch() {
+        search?.cancel()
+        search = nil
+        guard list.isShowingResults else { return }
+        spinner.stopAnimation(nil)
+        stopSearchButton.isHidden = true
+        resultsQuery = ""
+        list.endResults()
+        updateButtons()
+    }
+
+    /// Esc, Back or new text in the box: the plain folder comes back.
+    func leaveResults(clearText: Bool = true) {
+        guard list.isShowingResults else { return }
+        endSearch()
+        if clearText { searchField.stringValue = "" }
+        list.load(folder) { [weak self] error in
+            self?.showError(error)
+            self?.updateMessage()
+        }
+        delegate?.paneSelectionDidChange(self)
+    }
+
+    /// What the status bar adds after the number of results.
+    var searchStatus: String? {
+        guard list.isShowingResults else { return nil }
+        var text = " found"
+        if isSearching { text += " · searching…" } else if searchStopped { text += " · stopped" }
+        if searchStats.reachedLimit { text += " · first \(FolderSearch.defaultLimit.formatted()) only" }
+        if let skipped = notSearchedText { text += " · \(skipped)" }
+        return text
+    }
+
+    /// Why folders were not searched: the tooltip of the status bar.
+    var searchStatusDetail: String? {
+        guard list.isShowingResults, searchStats.foldersNotSearched > 0 else { return nil }
+        let parts = [(searchStats.cloudOnlyFolders, "only in the cloud"), (searchStats.unreadableFolders, "not readable"),
+                     (searchStats.otherVolumes, "on another disk")]
+        return parts.filter { $0.0 > 0 }.map { "\($0.0) \($0.1)" }.joined(separator: ", ")
+    }
+
+    private var notSearchedText: String? {
+        let n = searchStats.foldersNotSearched
+        return n == 0 ? nil : n == 1 ? "1 folder not searched" : "\(n) folders not searched"
+    }
 }
 
 /// The pane's top strip. The active one of two panes gets a light accent tint.
@@ -366,6 +520,10 @@ extension PaneViewController: FileListDelegate {
         switch key {
         case .back: goBack(); return true
         case .up: goUp(); return true
+        case .cancel:
+            guard list.isShowingResults else { return false }
+            leaveResults()
+            return true
         default: return delegate?.pane(self, handle: key) ?? false
         }
     }
@@ -393,8 +551,10 @@ extension PaneViewController: NSSearchFieldDelegate {
         if selector == #selector(NSResponder.cancelOperation(_:)) || selector == #selector(NSResponder.insertNewline(_:)) || selector == #selector(NSResponder.moveDown(_:)) {
             if selector == #selector(NSResponder.cancelOperation(_:)) {
                 searchField.stringValue = ""
+                leaveResults()
                 list.filterQuery = ""
             }
+            if selector == #selector(NSResponder.insertNewline(_:)) { searchSubfolders() }
             list.focus()
             if list.tableView.selectedRow < 0, !list.items.isEmpty { list.tableView.selectRowIndexes([0], byExtendingSelection: false) }
             return true

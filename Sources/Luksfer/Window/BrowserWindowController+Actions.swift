@@ -67,6 +67,13 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func quickLook(_ sender: Any?) { activePane.list.toggleQuickLook() }
 
+    /// On a search result: opens the folder it is in and selects it.
+    @objc func openContainingFolder(_ sender: Any?) {
+        guard let item = activePane.list.selectedItems.first else { return }
+        activePane.navigate(to: item.url.deletingLastPathComponent(), select: [item.url])
+        activePane.list.focus()
+    }
+
     @objc func openInTerminal(_ sender: Any?) { openTerminal(at: selectedFolderOrCurrent()) }
 
     @objc func pinToFavorites(_ sender: Any?) {
@@ -88,7 +95,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         let editingText = window?.firstResponder is NSText || terminalHasFocus
         let selection = activePane.list.selectedItems
         switch item.action {
-        case #selector(goBack(_:)): return activePane.history.canGoBack
+        case #selector(goBack(_:)): return activePane.canGoBack
         case #selector(goForward(_:)): return activePane.history.canGoForward
         case #selector(goUp(_:)): return !activePane.folder.isRootFolder
         case #selector(toggleHiddenFiles(_:)):
@@ -109,7 +116,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             return true
         case #selector(openSelection(_:)), #selector(quickLook(_:)):
             return !editingText && !selection.isEmpty
-        case #selector(renameSelection(_:)):
+        case #selector(renameSelection(_:)), #selector(openContainingFolder(_:)):
             return !editingText && selection.count == 1
         case #selector(moveToTrash(_:)), #selector(deleteImmediately(_:)), #selector(cut(_:)), #selector(copy(_:)),
              #selector(duplicateItems(_:)), #selector(compressItems(_:)):

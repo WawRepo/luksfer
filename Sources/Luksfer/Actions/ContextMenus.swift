@@ -26,6 +26,9 @@ enum ContextMenus {
         let single = items.count == 1 ? items[0] : nil
         add(menu, "Open", #selector(W.openSelection(_:)), symbol: "arrow.up.forward.square")
         if let single { menu.addItem(openWith(single.url)) }
+        if single != nil, pane.list.isShowingResults {
+            add(menu, "Open Containing Folder", #selector(W.openContainingFolder(_:)), symbol: "folder")
+        }
         add(menu, "Quick Look", #selector(W.quickLook(_:)), symbol: "eye")
         menu.addItem(.separator())
         add(menu, "Cut", #selector(W.cut(_:)), symbol: "scissors")
@@ -48,6 +51,9 @@ enum ContextMenus {
 
     private static func folder(_ menu: NSMenu, _ item: FileItem, pane: PaneViewController) {
         add(menu, "Open", #selector(W.openSelection(_:)), symbol: "folder")
+        if pane.list.isShowingResults {
+            add(menu, "Open Containing Folder", #selector(W.openContainingFolder(_:)), symbol: "folder")
+        }
         add(menu, "Open in Other Pane", #selector(W.openInOtherPane(_:)), symbol: "rectangle.split.2x1")
         let pinned = AppServices.shared.isFavorite(item.url)
         add(menu, pinned ? "Unpin from Favorites" : "Pin to Favorites", #selector(W.pinToFavorites(_:)), symbol: pinned ? "star.slash" : "star")
