@@ -16,6 +16,8 @@ to fork it or [open an issue](../../issues).
 
 **Status:** early (version 0.1). The main features work; expect rough edges.
 
+**Docs:** the guide, every key and an FAQ are at [wawrepo.github.io/luksfer](https://wawrepo.github.io/luksfer/).
+
 ![Luksfer with two panes: a Projects folder on the left and Downloads on the right](docs/images/two-panes.png)
 
 ## What it does
@@ -128,7 +130,8 @@ scripts/                  build, test, release and icon scripts
 docs/PRD.md               product requirements
 docs/spike-report.md      spike results and the stack choice
 docs/brand/               the icon and logo source image, and the logo
-.github/workflows/        CI (tests on every push) and the release build
+site/                     the docs site on GitHub Pages (plain HTML, built by scripts/build-site.sh)
+.github/workflows/        CI (tests on every push), the release build and the docs site
 ```
 
 ## License

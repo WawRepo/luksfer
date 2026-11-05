@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luksfer</title>
+<meta name="description" content="Luksfer is a free, open source file explorer for macOS that works like Windows Explorer.">
+<link rel="icon" href="images/favicon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="images/icon.png" alt="">Luksfer</a>
+    <nav>
+      <a href="./" aria-current="page">Home</a>
+      <a href="guide.html">Guide</a>
+      <a href="keys.html">Keys</a>
+      <a href="faq.html">FAQ</a>
+      <a href="https://github.com/WawRepo/luksfer">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <h1 class="hidden-title">Luksfer</h1>
+    <img class="logo" src="images/logo.png" alt="Luksfer">
+    <p class="lead">A file explorer for macOS that works like Windows Explorer. Enter opens, F2 renames,
+      right-click makes a new file, and cut and paste moves files.</p>
+    <div class="buttons">
+      <a class="button primary" href="https://github.com/WawRepo/luksfer/releases/latest">Download</a>
+      <a class="button" href="#install">How to install</a>
+      <a class="button" href="https://github.com/WawRepo/luksfer">Source code</a>
+    </div>
+    <p class="muted small">Free and open source (MIT). Apple Silicon, macOS 15 or newer.</p>
+  </section>
+
+  <img class="shot" src="images/two-panes.png" width="1360" height="760"
+       alt="Luksfer with two panes: a Projects folder on the left and Downloads on the right">
+
+  <p>"Luksfer" is Polish for a glass block, the brick that lets light through a wall. It started as
+    one person's fix after three decades on Windows: everything on the Mac was fine except Finder.
+    It does a small set of things and does not try to do more.</p>
+
+  <div class="cards">
+    <div class="card"><h3>Details view everywhere</h3><p>Name, Date modified, Type and Size in every folder. Folders sort first, like Explorer.</p></div>
+    <div class="card"><h3>One or two panes</h3><p>Drag and drop between them. Tab moves to the other pane.</p></div>
+    <div class="card"><h3>A path you can type</h3><p>Click a part of the path, or type or paste a path. Type <code>term</code> for a terminal.</p></div>
+    <div class="card"><h3>New file on right-click</h3><p>New folder and New text file on every right-click menu.</p></div>
+    <div class="card"><h3>Windows keys</h3><p>Enter opens, F2 renames, <kbd>⌘X</kbd> <kbd>⌘C</kbd> <kbd>⌘V</kbd> cut, copy and paste files.</p></div>
+    <div class="card"><h3>A terminal inside</h3><p>A panel at the bottom that follows the folder you are in.</p></div>
+  </div>
+
+  <h2>What it does</h2>
+  <ul>
+    <li>Details view by default, in every folder: Name, Date modified, Type, Size.</li>
+    <li>One or two panes, with drag and drop between them.</li>
+    <li>A path bar you can click or type into, with folder autocomplete.</li>
+    <li>A search box that filters the folder as you type. Enter also searches the subfolders.</li>
+    <li>Favorites in the sidebar: drag a folder in to pin it, drag to reorder, right-click to unpin.</li>
+    <li>New folder and New text file on every right-click. Compress to zip, and Extract for zip, 7z and tar files.</li>
+    <li>Windows keys. The back and forward buttons of a mouse work too.</li>
+    <li>Delete moves to the Trash. Every file action can be undone, or asks first.</li>
+    <li>A terminal panel in the window, and "Open in Terminal App" for Terminal, iTerm2, Ghostty or Warp.</li>
+    <li>Network drives (SMB), like Explorer's "Map network drive". Passwords stay in the macOS Keychain.</li>
+    <li>A new window from any app with <kbd>⌥⌘Space</kbd>, like <kbd>Win+E</kbd>.</li>
+  </ul>
+  <p>The <a href="guide.html">guide</a> explains each of these. The <a href="keys.html">keys page</a> lists every shortcut.</p>
+
+  <figure>
+    <img class="shot" src="images/terminal.png" width="1360" height="760"
+         alt="Luksfer with the terminal panel open below the file list">
+    <figcaption>The terminal panel. <code>cd</code> in the shell moves the pane, and opening a folder moves the shell.</figcaption>
+  </figure>
+
+  <h2 id="install">Install</h2>
+  <ol>
+    <li>Download <code>Luksfer-&lt;version&gt;.dmg</code> from the <a href="https://github.com/WawRepo/luksfer/releases/latest">latest release</a>.</li>
+    <li>Open it and drag Luksfer to Applications.</li>
+    <li>Open Luksfer. The app is not notarized by Apple, so macOS blocks the first open and shows
+      "Luksfer" Not Opened. Click <strong>Done</strong>, not <strong>Move to Trash</strong>.</li>
+    <li>Quit System Settings if it is open, then open it again. Go to Privacy &amp; Security and
+      scroll down to Security.</li>
+    <li>Click <strong>Open Anyway</strong> under "Allow applications from" and confirm with your
+      password or Touch ID. You do this only once per version.</li>
+  </ol>
+  <p>If <strong>Open Anyway</strong> does not appear, run this line in Terminal. It removes the
+    quarantine flag (the mark that makes macOS block a downloaded app) from Luksfer only, then opens
+    the app. Run it only on a copy you trust. The check below shows that GitHub built your copy.</p>
+  <pre><code>xattr -dr com.apple.quarantine /Applications/Luksfer.app &amp;&amp; open /Applications/Luksfer.app</code></pre>
+  <p>If you replace an older version that you keep in the Dock, the Dock icon can still point to the
+    old copy in the Trash. Remove that icon from the Dock, open the new app, then right-click its
+    icon and choose Options &gt; Keep in Dock.</p>
+
+  <h3 id="verify">Check that GitHub built your copy</h3>
+  <p>Each release has an attestation: a signed record of the repo, commit and workflow that built the
+    disk image. Check it with the <a href="https://cli.github.com">GitHub CLI</a>:</p>
+  <pre><code>gh attestation verify Luksfer-&lt;version&gt;.dmg --repo WawRepo/luksfer</code></pre>
+  <p>A copy that someone changed fails this check.</p>
+
+  <h2>Privacy</h2>
+  <ul>
+    <li>No network requests, no telemetry, no account. The one exception is a network drive that you
+      set up: macOS makes that connection.</li>
+    <li>Listing a cloud folder (Google Drive and other File Provider folders) never downloads a file.
+      Luksfer reads names, sizes and dates only, and draws icons from the file type.</li>
+    <li>Luksfer keeps its own settings in <code>~/Library/Application Support/Luksfer/</code>. It never
+      changes Finder's settings or Finder's sidebar.</li>
+    <li>This site has no cookies, no analytics and no files from other sites.</li>
+  </ul>
+
+  <h2>Something missing?</h2>
+  <p>Luksfer stays small on purpose. If you need more, <a href="https://github.com/WawRepo/luksfer/issues">open an issue</a>
+    or fork it.</p>
+</main>
+
+<footer>
+  <div class="wrap">
+    Luksfer is open source under the <a href="https://github.com/WawRepo/luksfer/blob/main/LICENSE">MIT license</a>.
+    · <a href="https://github.com/WawRepo/luksfer">Source on GitHub</a>
+    · <a href="https://github.com/WawRepo/luksfer/releases">Releases</a>
+  </div>
+</footer>
+</body>
+</html>

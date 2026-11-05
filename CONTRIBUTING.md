@@ -44,6 +44,7 @@ scripts/build.sh                      # debug build
 LUKSFER_SWIFT=test scripts/build.sh   # unit tests
 scripts/build-app.sh                  # ~/Library/Caches/luksfer-dev/dist/Luksfer.app
 scripts/readme-shots.sh               # the README screenshots, with made-up files in a sandbox
+scripts/build-site.sh <new folder>    # the docs site (site/) with its images, as GitHub Pages gets it
 ```
 
 A test cannot make a folder that is only in the cloud. To check that the search starts no download, run

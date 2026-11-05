@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luksfer FAQ</title>
+<meta name="description" content="Answers about installing Luksfer, privacy, network drive passwords, and what Luksfer does not do.">
+<link rel="icon" href="images/favicon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="images/icon.png" alt="">Luksfer</a>
+    <nav>
+      <a href="./">Home</a>
+      <a href="guide.html">Guide</a>
+      <a href="keys.html">Keys</a>
+      <a href="faq.html" aria-current="page">FAQ</a>
+      <a href="https://github.com/WawRepo/luksfer">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>FAQ</h1>
+
+  <h2>Install</h2>
+  <details>
+    <summary>Why does macOS block Luksfer the first time I open it?</summary>
+    <p>Apple did not notarize Luksfer. Notarization is Apple's check of apps from outside the App
+      Store. macOS blocks the first open of an app without it. You allow Luksfer once per version in
+      System Settings &gt; Privacy &amp; Security &gt; Open Anyway. The <a href="./#install">install
+      steps</a> show each click.</p>
+  </details>
+  <details>
+    <summary>How do I know the download is the real one?</summary>
+    <p>Each release has a GitHub attestation: a signed record of the repo, commit and workflow that
+      built the disk image. Run <code>gh attestation verify Luksfer-&lt;version&gt;.dmg --repo WawRepo/luksfer</code>.
+      A changed copy fails. The source code is on <a href="https://github.com/WawRepo/luksfer">GitHub</a>,
+      so you can also build it yourself.</p>
+  </details>
+  <details>
+    <summary>Does it work on an Intel Mac, or an older macOS?</summary>
+    <p>No. Luksfer needs a Mac with Apple Silicon and macOS 15 or newer.</p>
+  </details>
+  <details>
+    <summary>Why is it not on the Mac App Store?</summary>
+    <p>App Store apps must run in Apple's sandbox, which lets an app open only the files you pick.
+      A file explorer has to see all your folders, so the sandbox does not fit.</p>
+  </details>
+  <details>
+    <summary>How do I update?</summary>
+    <p>Download the new disk image and drag Luksfer to Applications again. Choose Replace. If you keep
+      Luksfer in the Dock, remove the old icon and add the new app again, because the old icon can
+      point to the copy in the Trash.</p>
+  </details>
+  <details>
+    <summary>How do I remove Luksfer?</summary>
+    <ol>
+      <li>In Settings, turn off "Open Luksfer at login".</li>
+      <li>Quit Luksfer and move <code>/Applications/Luksfer.app</code> to the Trash.</li>
+      <li>To remove the settings too, delete <code>~/Library/Application Support/Luksfer/</code>.</li>
+      <li>To remove saved network drive passwords, open Keychain Access, search for
+        <code>io.github.wawrepo.luksfer.network-drive</code> and delete those items.</li>
+    </ol>
+  </details>
+
+  <h2>Privacy and safety</h2>
+  <details>
+    <summary>Does Luksfer send anything over the internet?</summary>
+    <p>No. Luksfer makes no network requests, has no telemetry and needs no account. The one exception
+      is a network drive that you add yourself: macOS makes that connection.</p>
+  </details>
+  <details>
+    <summary>Will it download my Google Drive or iCloud files?</summary>
+    <p>No. For cloud folders, Luksfer reads names, sizes and dates only, and draws icons from the file
+      type. Listing and searching never start a download.</p>
+  </details>
+  <details>
+    <summary>Does Luksfer change Finder?</summary>
+    <p>No. Luksfer keeps its own settings in <code>~/Library/Application Support/Luksfer/</code>. It
+      never changes Finder's settings or Finder's sidebar. Finder still runs the desktop and the Dock,
+      and "Show in Finder" in other apps still opens Finder.</p>
+  </details>
+  <details>
+    <summary>Can I lose a file by mistake?</summary>
+    <p>Delete moves files to the Trash. Delete Immediately asks first. Rename, move, copy, new items,
+      Trash and Extract can be undone with <kbd>⌘Z</kbd>. When a name is taken, Luksfer asks before it
+      replaces anything.</p>
+  </details>
+
+  <h2>Network drives</h2>
+  <details>
+    <summary>Why does macOS ask for my Mac password when I connect a drive?</summary>
+    <p>Luksfer keeps the drive's password in your login keychain. macOS asks for your Mac password
+      before it lets Luksfer read it. Click <strong>Always Allow</strong> so it does not ask every time.
+      This keychain question takes your Mac password, not Touch ID.</p>
+    <p>A new version of Luksfer can make macOS ask once more. The app is not signed with an Apple
+      developer certificate, so macOS sees each version as a new app.</p>
+  </details>
+  <details>
+    <summary>Which kinds of network drives work?</summary>
+    <p>SMB only: a NAS, a Windows shared folder, or a shared folder on another Mac. The address looks
+      like <code>smb://server/share</code> or <code>\\server\share</code>.</p>
+  </details>
+
+  <h2>Features</h2>
+  <details>
+    <summary>Why are there no tabs?</summary>
+    <p>Two panes and more windows (<kbd>⌘N</kbd>, or <kbd>⌥⌘Space</kbd> from any app) do the same job
+      with less to learn.</p>
+  </details>
+  <details>
+    <summary>Why is there no preview pane?</summary>
+    <p><kbd>Space</kbd> opens Quick Look, the macOS preview, for any file.</p>
+  </details>
+  <details>
+    <summary>Can it rename many files at once?</summary>
+    <p>No. A script or an AI agent in the terminal panel does that better. Press <kbd>⌃`</kbd> to open
+      a terminal in the folder.</p>
+  </details>
+  <details>
+    <summary>Which archives can it extract?</summary>
+    <p><code>.zip</code>, <code>.7z</code>, <code>.tar</code>, <code>.tar.gz</code>, <code>.tgz</code>,
+      <code>.tar.bz2</code>, <code>.tbz2</code>, <code>.tar.xz</code> and <code>.txz</code>. Not RAR,
+      and not archives with a password. Compress makes zip files.</p>
+  </details>
+  <details>
+    <summary>The <kbd>⌥⌘Space</kbd> key does nothing. Why?</summary>
+    <ul>
+      <li>Luksfer must be running. Turn on Settings &gt; "Open Luksfer at login" so it always is.</li>
+      <li>macOS uses the same key for the Finder search window. Turn that off in System Settings &gt;
+        Keyboard &gt; Keyboard Shortcuts… &gt; Spotlight &gt; "Show Finder search window".</li>
+      <li>Check that Settings &gt; "⌥⌘Space opens a new window in Downloads" is on.</li>
+    </ul>
+  </details>
+  <details>
+    <summary>I need a feature that is not here.</summary>
+    <p>Luksfer stays small on purpose. <a href="https://github.com/WawRepo/luksfer/issues">Open an issue</a>
+      to ask, or fork the code and add it.</p>
+  </details>
+</main>
+
+<footer>
+  <div class="wrap">
+    Luksfer is open source under the <a href="https://github.com/WawRepo/luksfer/blob/main/LICENSE">MIT license</a>.
+    · <a href="https://github.com/WawRepo/luksfer">Source on GitHub</a>
+    · <a href="https://github.com/WawRepo/luksfer/releases">Releases</a>
+  </div>
+</footer>
+</body>
+</html>

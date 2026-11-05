@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Luksfer Guide</title>
+<meta name="description" content="How to use Luksfer: panes, the path bar, search, Favorites, file actions, Extract, the terminal and network drives.">
+<link rel="icon" href="images/favicon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="images/icon.png" alt="">Luksfer</a>
+    <nav>
+      <a href="./">Home</a>
+      <a href="guide.html" aria-current="page">Guide</a>
+      <a href="keys.html">Keys</a>
+      <a href="faq.html">FAQ</a>
+      <a href="https://github.com/WawRepo/luksfer">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <h1>Guide</h1>
+  <p class="lead">How each part of Luksfer works. Shortcuts are the Windows keys, which are on by
+    default. The <a href="keys.html">keys page</a> lists all of them.</p>
+
+  <ol class="toc">
+    <li><a href="#panes">Windows and panes</a></li>
+    <li><a href="#moving">Moving around</a></li>
+    <li><a href="#path">The path bar</a></li>
+    <li><a href="#search">Search</a></li>
+    <li><a href="#sidebar">Favorites and the sidebar</a></li>
+    <li><a href="#files">Working with files</a></li>
+    <li><a href="#archives">Compress and Extract</a></li>
+    <li><a href="#terminal">The terminal</a></li>
+    <li><a href="#network">Network drives</a></li>
+    <li><a href="#hotkey">A new window from any app</a></li>
+    <li><a href="#settings">Settings</a></li>
+  </ol>
+
+  <h2 id="panes">Windows and panes</h2>
+  <ul>
+    <li>A window has one or two panes. Switch with the toolbar button, <kbd>⌥⌘1</kbd> or <kbd>⌥⌘2</kbd>.</li>
+    <li>Each pane has its own folder, history, selection, sort and search.</li>
+    <li><kbd>Tab</kbd> moves to the other pane. The active pane has a clear mark.</li>
+    <li>Open in Other Pane is on a folder's right-click menu. Swap Panes is <kbd>⌥⌘U</kbd>, and Same
+      Folder in Both is <kbd>⌥⌘=</kbd>.</li>
+    <li><kbd>⌘N</kbd> opens another window. Luksfer remembers its windows, panes and folders when you
+      quit and open it again.</li>
+  </ul>
+  <p>Every folder opens in the details view: Name, Date modified, Type and Size. Right-click a column
+    header to show Date created or Extension. Drag a column to move it, or drag its edge to resize it.
+    Click a header to sort. Like Explorer, folders come first in an ascending sort.</p>
+  <p>Hidden files are off at first. <kbd>⇧⌘.</kbd> shows them, and Luksfer remembers the choice.
+    <kbd>Space</kbd> opens Quick Look, the macOS preview.</p>
+
+  <h2 id="moving">Moving around</h2>
+  <ul>
+    <li><kbd>Enter</kbd> opens the selected file or folder.</li>
+    <li>Back and forward: the toolbar buttons, <kbd>⌘[</kbd> and <kbd>⌘]</kbd>, <kbd>Backspace</kbd>, or
+      the back and forward buttons of a mouse. The mouse buttons work on the pane under the pointer.</li>
+    <li><kbd>⌘↑</kbd> goes up one folder.</li>
+    <li>Type the first letters of a name to jump to it.</li>
+    <li>The Go menu has Home, Desktop, Documents, Downloads and Applications.</li>
+  </ul>
+
+  <h2 id="path">The path bar</h2>
+  <ul>
+    <li>Click a part of the path to go there. Click the <code>›</code> after a part to list its subfolders.</li>
+    <li>Click the empty end of the bar, or press <kbd>⌘L</kbd>, to type a path. The whole path is
+      selected, so you can paste over it.</li>
+    <li>It takes <code>~</code>, full paths, relative paths, and paths copied from a terminal, with
+      quotes or <code>\ </code> escapes. A path to a file opens its folder and selects the file.</li>
+    <li>Folder names complete as you type. <kbd>Tab</kbd> completes, <kbd>Enter</kbd> goes,
+      <kbd>Esc</kbd> cancels.</li>
+    <li>Type <code>term</code>, <code>terminal</code> or <code>cmd</code> to open the terminal in this folder.</li>
+    <li><kbd>⌥⌘C</kbd> copies the path of the selected item, or of the folder.</li>
+  </ul>
+
+  <h2 id="search">Search</h2>
+  <ul>
+    <li><kbd>⌘F</kbd> goes to the pane's search box. The list shows only the names that match as you type.</li>
+    <li><kbd>Enter</kbd> also searches the subfolders. Results come in as Luksfer finds them, with a
+      Folder column that says where each one is. Every file action works on them.</li>
+    <li>Stop ends the search and keeps the results. <kbd>Esc</kbd>, Back or new text returns to the folder.</li>
+    <li>"Open Containing Folder" on a result's right-click menu goes to its folder.</li>
+  </ul>
+  <p class="note">Search matches names only, and stops at 20,000 results. It does not follow links,
+    look inside apps, or go into another disk or network drive. It never opens a cloud folder whose
+    contents are only online, so it never starts a download. The status bar counts the folders it
+    skipped.</p>
+
+  <h2 id="sidebar">Favorites and the sidebar</h2>
+  <ul>
+    <li><strong>Favorites:</strong> drag a folder onto Favorites to pin it, or use Pin to Favorites
+      (<kbd>⌃⌘T</kbd>). Drag to reorder. Right-click to unpin, or choose Rename Label… to change the
+      name. The path stays the same.</li>
+    <li><strong>This Mac:</strong> Home, Desktop, Documents, Downloads, Pictures, and cloud folders
+      such as Google Drive.</li>
+    <li><strong>Locations:</strong> the start disk, Applications, external drives (with Eject), and
+      the Trash.</li>
+    <li><strong>Network:</strong> your saved <a href="#network">network drives</a>, then network
+      volumes that you connected some other way.</li>
+  </ul>
+  <p>Sections fold open and closed, and Luksfer remembers which ones you folded. <kbd>⌃⌘S</kbd>
+    hides or shows the sidebar.</p>
+
+  <h2 id="files">Working with files</h2>
+  <h3>New files and folders</h3>
+  <p>Right-click a file or empty space for New Folder and New Text File. Empty space also has New
+    Markdown File. A folder's right-click menu has a New submenu that makes the item inside the folder
+    or next to it. The new item starts with its name selected, so you can type a name. <kbd>Esc</kbd>
+    keeps the default name.</p>
+  <p>Keys: <kbd>⇧⌘N</kbd> for a new folder, <kbd>⌥⌘N</kbd> for a new text file.</p>
+
+  <h3>Rename</h3>
+  <p><kbd>F2</kbd> renames in place. On most Mac keyboards you press <kbd>fn</kbd> with
+    <kbd>F2</kbd>. If you prefer the Finder way, the Finder keys setting makes <kbd>Enter</kbd> rename.</p>
+
+  <h3>Cut, copy and paste</h3>
+  <ul>
+    <li><kbd>⌘X</kbd>, <kbd>⌘C</kbd> and <kbd>⌘V</kbd> cut, copy and paste files.</li>
+    <li>Copy and paste work both ways with Finder. Finder has no cut, so a cut in Luksfer that you
+      paste in Finder becomes a copy.</li>
+    <li><kbd>⌥⌘V</kbd> (Move Here) moves what you copied, like Finder.</li>
+  </ul>
+
+  <h3>Drag and drop</h3>
+  <p>Drag between panes, onto a folder row, onto Favorites (this pins the folder), and to and from
+    other apps. On the same disk a drag moves; to another disk it copies. Hold <kbd>⌥</kbd> to copy
+    or <kbd>⌘</kbd> to move. A badge shows what will happen.</p>
+
+  <h3>When a name is taken</h3>
+  <p>Luksfer asks: Replace, Skip or Keep Both. It shows the size and date of both items. When more
+    items follow, "Do this for all" answers for the rest. Stop (<kbd>Esc</kbd>) ends the action.</p>
+
+  <h3>Trash and Undo</h3>
+  <ul>
+    <li><kbd>⌘⌫</kbd> moves to the Trash. Delete Immediately (<kbd>⌥⌘⌫</kbd>) skips the Trash, and
+      asks first.</li>
+    <li><kbd>⌘Z</kbd> undoes rename, move, copy, new item, Trash and Extract. One Undo undoes one action.</li>
+    <li>After an action, the status bar says what happened, with an Undo button.</li>
+    <li>Long copies show progress in the status bar. You can stop them, and the window keeps working.</li>
+  </ul>
+
+  <h2 id="archives">Compress and Extract</h2>
+  <p><strong>Compress</strong> on the right-click menu makes a zip file of the selected items.</p>
+  <p><strong>Extract</strong> is on the right-click menu of an archive, and in the File menu. It
+    knows these endings: <code>.zip</code>, <code>.7z</code>, <code>.tar</code>,
+    <code>.tar.gz</code>, <code>.tgz</code>, <code>.tar.bz2</code>, <code>.tbz2</code>,
+    <code>.tar.xz</code> and <code>.txz</code>. It uses the tools that come with macOS.</p>
+  <ul>
+    <li>What is in the archive comes out next to it. The archive stays.</li>
+    <li>One item at the top comes out as itself. Several come out in a folder named after the
+      archive: <code>photos.tar.gz</code> gives a folder <code>photos</code>.</li>
+    <li>A taken name gets a number, such as <code>Report (2)</code>. Nothing is overwritten.</li>
+    <li>If the extract fails, nothing is left behind. <kbd>⌘Z</kbd> moves what came out to the Trash.</li>
+    <li>An archive from the internet keeps the macOS download mark on what comes out, so macOS still
+      checks those files.</li>
+    <li>An archive with a password shows an error. RAR files get no Extract.</li>
+  </ul>
+
+  <h2 id="terminal">The terminal</h2>
+  <ul>
+    <li><kbd>⌃`</kbd> opens and closes a terminal panel at the bottom of the window. It runs your
+      login shell (zsh) in the active pane's folder.</li>
+    <li><strong>Follow</strong> (on at first): <code>cd</code> in the terminal moves the active pane,
+      and opening a folder moves the shell. This happens only while the shell waits at its prompt,
+      not while a command runs.</li>
+    <li>Open in Terminal App (<kbd>⌥⌘T</kbd>) opens Terminal, iTerm2, Ghostty or Warp in the folder.
+      Settings picks the app.</li>
+    <li>Programs that print text in the panel cannot read or change your clipboard.</li>
+  </ul>
+
+  <h2 id="network">Network drives</h2>
+  <p>Like Explorer's "Map network drive". Luksfer supports SMB drives, such as a NAS or a shared
+    folder on another computer.</p>
+  <ol>
+    <li>Click the <strong>+</strong> next to Network in the sidebar, or press <kbd>⌘K</kbd>.</li>
+    <li>Type the address: <code>smb://server/share</code> or <code>\\server\share</code>.</li>
+    <li>Give it a name. Type your user name, or leave it empty for guest access, and the password.</li>
+  </ol>
+  <ul>
+    <li>Click the drive to connect. It opens in the active pane. A connected drive has an Eject
+      button that disconnects it.</li>
+    <li>Right-click a drive for Connect, Open in Other Pane, Disconnect, Edit and Remove from Sidebar.</li>
+    <li>The password goes into the macOS Keychain only, never into Luksfer's settings file. Luksfer
+      never shows a saved password again. Edit can only replace it.</li>
+    <li>macOS makes the connection. It runs in the background, and the Stop button ends it.</li>
+  </ul>
+
+  <h2 id="hotkey">A new window from any app</h2>
+  <p>Press <kbd>⌥⌘Space</kbd> in any app, Luksfer included, to open a new single-pane window in
+    Downloads, like <kbd>Win+E</kbd> on Windows.</p>
+  <ul>
+    <li>Luksfer has to be running for the key to work. It keeps running when you close its last
+      window. To start it when you log in, turn on Settings &gt; "Open Luksfer at login".</li>
+    <li>macOS uses <kbd>⌥⌘Space</kbd> for the Finder search window. Turn that off first: System
+      Settings &gt; Keyboard &gt; Keyboard Shortcuts… &gt; Spotlight &gt; "Show Finder search window".</li>
+    <li>To turn the key off, use Settings &gt; "⌥⌘Space opens a new window in Downloads". Luksfer then
+      quits when you close its last window.</li>
+  </ul>
+
+  <h2 id="settings">Settings</h2>
+  <p>Open Settings with <kbd>⌘,</kbd>.</p>
+  <div class="table">
+    <table>
+      <thead><tr><th>Setting</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>Keys</td><td>Windows: <kbd>Enter</kbd> opens, <kbd>F2</kbd> renames. Finder: <kbd>Enter</kbd> renames, <kbd>⌘↓</kbd> opens.</td></tr>
+        <tr><td>Show hidden files</td><td>The same as <kbd>⇧⌘.</kbd></td></tr>
+        <tr><td>⌥⌘Space opens a new window in Downloads</td><td>The key from any app. On at first.</td></tr>
+        <tr><td>Open Luksfer at login</td><td>Starts Luksfer without a window when you log in, so the key works at once.</td></tr>
+        <tr><td>Open in Terminal app uses</td><td>Terminal, iTerm2, Ghostty or Warp.</td></tr>
+        <tr><td>Follow</td><td>The terminal panel and the active pane stay in the same folder.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    Luksfer is open source under the <a href="https://github.com/WawRepo/luksfer/blob/main/LICENSE">MIT license</a>.
+    · <a href="https://github.com/WawRepo/luksfer">Source on GitHub</a>
+    · <a href="https://github.com/WawRepo/luksfer/releases">Releases</a>
+  </div>
+</footer>
+</body>
+</html>
