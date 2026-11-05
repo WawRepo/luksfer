@@ -36,6 +36,7 @@ extension BrowserWindowController {
     @objc func deleteImmediately(_ sender: Any?) { FileActions.shared.deletePermanently(selection, in: self) }
     @objc func duplicateItems(_ sender: Any?) { FileActions.shared.duplicate(selection, in: self) }
     @objc func compressItems(_ sender: Any?) { FileActions.shared.compress(selection, in: self) }
+    @objc func extractItems(_ sender: Any?) { FileActions.shared.extract(selection, in: self) }
 
     @objc func getInfo(_ sender: Any?) {
         let items = activePane.list.selectedItems

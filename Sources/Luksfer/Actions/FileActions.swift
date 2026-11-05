@@ -200,6 +200,42 @@ final class FileActions {
         }
     }
 
+    // MARK: Extract
+
+    /// Extracts zip files next to themselves. The zips stay. Undo moves what came out to the Trash.
+    func extract(_ zips: [URL], in window: BrowserWindowController) {
+        guard !zips.isEmpty else { return }
+        window.statusBar.showProgress("Extracting \(Self.describe(zips))", fraction: nil)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let (made, failure) = Self.extractAll(zips)
+            DispatchQueue.main.async {
+                window.statusBar.hideProgress()
+                guard let self else { return }
+                if !made.isEmpty {
+                    self.registerStep("Extract") { target in
+                        Task { @MainActor in
+                            do { _ = try await target.engine.trash(made) } catch { window.showError(error) }
+                        }
+                    }
+                    let folders = Set(made.map { $0.deletingLastPathComponent() })
+                    self.reloadPanes(in: window, showing: folders, select: made)
+                    let text = made.count == 1 ? "Extracted to “\(made[0].lastPathComponent)”" : "Extracted \(made.count) zip files"
+                    window.statusBar.showMessage(text, undo: self.undoLast)
+                }
+                if let failure { window.showError(failure) }
+            }
+        }
+    }
+
+    /// Stops at the first failure. What came out before it stays, and Undo can remove it.
+    private static func extractAll(_ zips: [URL]) -> (made: [URL], failure: Error?) {
+        var made: [URL] = []
+        for zip in zips {
+            do { made.append(try ZipExtractor.extract(zip)) } catch { return (made, error) }
+        }
+        return (made, nil)
+    }
+
     // MARK: Running, progress, undo
 
     func cancelCurrent() { running?.cancel() }

@@ -30,6 +30,7 @@ enum MainMenu {
             item("Rename", #selector(BrowserWindowController.renameSelection(_:)), functionKey(NSF2FunctionKey), []),
             item("Duplicate", sel("duplicateItems:"), "d"),
             item("Compress", sel("compressItems:")),
+            item("Extract", sel("extractItems:")),
             item("Get Info", sel("getInfo:"), "i"),
             item("Pin to Favorites", #selector(BrowserWindowController.pinToFavorites(_:)), "t", [.command, .control]),
             .separator(),

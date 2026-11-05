@@ -121,7 +121,7 @@ inside the window. It is the app you open for everyday file work instead of Find
 ### 5.5 Context menus
 
 - **On a file:** Open, Open With ▸, Quick Look, Cut, Copy, Copy Path, Rename, Duplicate, Compress,
-  Move to Trash; New folder and New text file *next to this file*; Open in Terminal (inside), Open in
+  Extract (zip files only), Move to Trash; New folder and New text file *next to this file*; Open in Terminal (inside), Open in
   Terminal App; Get Info.
 - **On a folder:** Open, Open in Other Pane, Pin to or Unpin from Favorites, Cut, Copy, Paste Into
   Folder, Copy Path, Rename, Move to Trash; a New ▸ submenu with a folder or text file *inside it* or
@@ -144,6 +144,10 @@ inside the window. It is the app you open for everyday file work instead of Find
 - After an action, the status bar says what it did, with Undo where it can be undone.
 - Long copies show progress in the status bar, can be stopped, and never block the window.
 - Undo (⌘Z) for rename, move, copy, new item and Trash. One Undo undoes one action.
+- Extract puts what is in a zip next to the zip, and the zip stays. One item at the top of the zip
+  comes out as itself; several come out in a folder named after the zip. A taken name gets a number,
+  so nothing is overwritten. A failed extract leaves nothing behind. Undo moves the result to the
+  Trash. A downloaded zip's quarantine mark carries over, so macOS still checks what comes out.
 - Rename in place with F2 (or Enter with Finder keys).
 
 ### 5.7 Terminal
@@ -221,9 +225,11 @@ inside the window. It is the app you open for everyday file work instead of Find
 ## 8. Out of scope for version 1
 
 - Replacing the desktop or the Dock.
-- Tabs inside a pane (planned right after version 1).
-- FTP, SFTP, AFP, NFS and cloud-storage connections; archives opened as folders; batch rename;
-  folder compare and sync; a git status column; tags; a Spotlight-wide search screen.
+- Tabs inside a pane: two panes and new windows are enough.
+- A preview pane: Space already opens Quick Look.
+- Batch rename: an agent or a script in the terminal can do it.
+- FTP, SFTP, AFP, NFS and cloud-storage connections; archives opened as folders; folder compare and
+  sync; a git status column; tags; a Spotlight-wide search screen.
 - Windows and Linux versions; the Mac App Store.
 
 ## 9. Risks and open questions
@@ -249,6 +255,6 @@ inside the window. It is the app you open for everyday file work instead of Find
 5. **Terminal** — done. The built-in panel with Follow, Open in Terminal App, and `term` in the path
    bar. Network drives were added after this milestone.
 6. **Daily use** — next. Use Luksfer as the everyday file manager, fix what hurts, add the default
-   file viewer switch. Then decide on tabs and the Icons view.
+   file viewer switch. Then decide on the Icons view.
 7. **First public release** — a disk image on GitHub Releases, with an attestation and clear
    install steps.

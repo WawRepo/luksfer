@@ -676,6 +676,71 @@ enum SelfTest {
               made && !names(box).contains("marker"))
     }
 
+    /// Extract on the right-click menu: what is in a zip comes out next to it, Undo takes it back,
+    /// and a damaged zip shows an error and leaves nothing behind.
+    private static func extractZips(in folder: URL, window w: BrowserWindowController) async {
+        let pane = w.activePane
+        let fm = FileManager.default
+        let box = folder.appendingPathComponent("zips", isDirectory: true)
+        let source = box.appendingPathComponent("Report", isDirectory: true)
+        try? fm.createDirectory(at: source, withIntermediateDirectories: true)
+        fm.createFile(atPath: source.appendingPathComponent("summary.txt").path, contents: Data("text".utf8))
+        let note = box.appendingPathComponent("note.txt")
+        fm.createFile(atPath: note.path, contents: Data("text".utf8))
+        let trash = URL(fileURLWithPath: ProcessInfo.processInfo.environment["LUKSFER_TRASH_DIR"]!)
+
+        FileActions.shared.compress([source], in: w)
+        let zipped = await waitFor(10) { names(box).contains("Report.zip") }
+        await settle()
+        check("Extract: the test zip is made", zipped)
+        try? fm.moveItem(at: source, to: box.appendingPathComponent("kept"))
+        pane.navigate(to: box)
+        await wait()
+        pane.list.focus()
+
+        let zip = box.appendingPathComponent("Report.zip")
+        func menuTitles(_ name: String) -> [String] {
+            guard let item = pane.list.items.first(where: { $0.name == name }) else { return [] }
+            return ContextMenus.menu(for: [item], in: pane, window: w).items.map(\.title)
+        }
+        let titles = menuTitles("Report.zip")
+        check("Extract: a zip's menu has Extract right after Compress",
+              titles.firstIndex(of: "Extract") == titles.firstIndex(of: "Compress").map { $0 + 1 } && titles.contains("Extract"))
+        check("Extract: another file's menu has no Extract", !menuTitles("note.txt").contains("Extract") && !menuTitles("note.txt").isEmpty)
+        let action = #selector(BrowserWindowController.extractItems(_:))
+        check("Extract: the File menu has it", NSApp.mainMenu?.items.contains { $0.submenu?.items.contains { $0.action == action } == true } == true)
+        let probe = NSMenuItem(title: "Extract", action: action, keyEquivalent: "")
+        pane.list.select([note], scroll: false)
+        check("Extract: the File menu item is off for another file", !w.validateMenuItem(probe))
+        pane.list.select([zip], scroll: false)
+        check("Extract: the File menu item is on for a zip", w.validateMenuItem(probe))
+
+        w.extractItems(nil)
+        let result = source
+        let came = await waitFor(10) { fm.fileExists(atPath: result.appendingPathComponent("summary.txt").path) }
+        await settle()
+        check("Extract: the zip's contents come out next to it, and the zip stays", came && fm.fileExists(atPath: zip.path))
+        check("Extract: no hidden work folder stays behind", !names(box).contains { $0.hasPrefix(".luksfer-extract") })
+        check("Extract: the list selects what came out", pane.list.selectedItems.map(\.name) == ["Report"])
+        DevHooks.snapshot(to: folder.deletingLastPathComponent().appendingPathComponent("selftest-extract.png"))
+
+        let trashed = names(trash).count
+        AppServices.shared.undoManager.undo()
+        let undone = await waitFor(10) { !fm.fileExists(atPath: result.path) }
+        await settle()
+        check("Extract: Undo moves what came out to the Trash", undone && names(trash).count == trashed + 1 && fm.fileExists(atPath: zip.path))
+
+        let damaged = box.appendingPathComponent("damaged.zip")
+        fm.createFile(atPath: damaged.path, contents: Data("this is not a zip".utf8))
+        let before = names(box)
+        FileActions.shared.extract([damaged], in: w)
+        check("Extract: a damaged zip shows an error", await answer("OK", on: w.window))
+        await settle()
+        check("Extract: a damaged zip leaves nothing behind", names(box) == before)
+        pane.navigate(to: folder)
+        await wait()
+    }
+
     private static func newWindow() async {
         let before = NSApp.windows.filter { $0.windowController is BrowserWindowController }.count
         (NSApp.delegate as? AppDelegate)?.newWindow(nil)
@@ -913,6 +978,7 @@ enum SelfTest {
         await drops(in: folder, window: w)
         await subfolderSearch(in: folder, window: w)
         await compressOddNames(in: folder, window: w)
+        await extractZips(in: folder, window: w)
         await newWindow()
         await comeBack(in: folder, window: w)
         await hotKey(window: w)

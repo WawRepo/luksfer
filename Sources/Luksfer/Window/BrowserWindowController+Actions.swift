@@ -121,6 +121,9 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(moveToTrash(_:)), #selector(deleteImmediately(_:)), #selector(cut(_:)), #selector(copy(_:)),
              #selector(duplicateItems(_:)), #selector(compressItems(_:)):
             return !editingText && !selection.isEmpty
+        case #selector(extractItems(_:)):
+            let items = activePane.list.selectedItems
+            return !editingText && !items.isEmpty && items.allSatisfy(ZipExtractor.canExtract)
         case #selector(paste(_:)), #selector(pasteMove(_:)):
             return !editingText && FileClipboard.hasFiles
         case #selector(pasteInto(_:)):
