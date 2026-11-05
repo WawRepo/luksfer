@@ -38,7 +38,7 @@ enum ContextMenus {
         if single != nil { add(menu, "Rename", #selector(W.renameSelection(_:)), symbol: "pencil") }
         add(menu, "Duplicate", #selector(W.duplicateItems(_:)), symbol: "plus.square.on.square")
         add(menu, "Compress", #selector(W.compressItems(_:)), symbol: "archivebox")
-        if items.allSatisfy(ZipExtractor.canExtract) {
+        if items.allSatisfy(ArchiveExtractor.canExtract) {
             add(menu, "Extract", #selector(W.extractItems(_:)), symbol: "arrow.up.bin")
         }
         add(menu, "Move to Trash", #selector(W.moveToTrash(_:)), symbol: "trash")

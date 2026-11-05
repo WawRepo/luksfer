@@ -25,7 +25,7 @@ to fork it or [open an issue](../../issues).
 - A path bar you can click or type into, with folder autocomplete. Type `term` to open a terminal.
 - A search box that filters the folder as you type. Enter also searches the subfolders.
 - Favorites in the sidebar: drag a folder in to pin it, drag to reorder, right-click to unpin.
-- New folder and New text file on every right-click. Compress and Extract for zip files.
+- New folder and New text file on every right-click. Compress to zip, and Extract for zip, 7z and tar files.
 - Windows keys: Enter opens, F2 renames, ⌘X / ⌘C / ⌘V cut, copy and paste files. The back and
   forward buttons of a mouse work too.
 - Delete moves to the Trash. Every file action can be undone, or asks first.

@@ -677,7 +677,7 @@ enum SelfTest {
     }
 
     /// Extract on the right-click menu: what is in a zip comes out next to it, Undo takes it back,
-    /// and a damaged zip shows an error and leaves nothing behind.
+    /// and a damaged zip shows an error and leaves nothing behind. A tar.gz and a 7z come out too.
     private static func extractZips(in folder: URL, window w: BrowserWindowController) async {
         let pane = w.activePane
         let fm = FileManager.default
@@ -737,8 +737,54 @@ enum SelfTest {
         check("Extract: a damaged zip shows an error", await answer("OK", on: w.window))
         await settle()
         check("Extract: a damaged zip leaves nothing behind", names(box) == before)
+
+        // A tar.gz and a 7z go to macOS's tar. Both at once, from the File menu.
+        let notes = box.appendingPathComponent("Notes", isDirectory: true)
+        try? fm.createDirectory(at: notes, withIntermediateDirectories: true)
+        fm.createFile(atPath: notes.appendingPathComponent("plan.txt").path, contents: Data("text".utf8))
+        fm.createFile(atPath: notes.appendingPathComponent("list.txt").path, contents: Data("text".utf8))
+        let tgz = box.appendingPathComponent("Notes.tar.gz"), seven = box.appendingPathComponent("Photos.7z")
+        let madeTar = tar(["-c", "-z", "-f", tgz.path, "-C", box.path, "Notes"])
+            && tar(["-c", "--format", "7zip", "-f", seven.path, "-C", notes.path, "plan.txt", "list.txt"])
+        try? fm.moveItem(at: notes, to: box.appendingPathComponent("kept-notes"))
+        check("Extract: the test tar.gz and 7z are made", madeTar)
+        pane.navigate(to: box)
+        await wait()
+        check("Extract: a tar.gz's and a 7z's menus have Extract",
+              menuTitles("Notes.tar.gz").contains("Extract") && menuTitles("Photos.7z").contains("Extract"))
+        pane.list.select([tgz, seven], scroll: false)
+        check("Extract: the File menu item is on for a tar.gz and a 7z", w.validateMenuItem(probe))
+        w.extractItems(nil)
+        let both = await waitFor(10) {
+            fm.fileExists(atPath: box.appendingPathComponent("Notes/plan.txt").path)
+                && fm.fileExists(atPath: box.appendingPathComponent("Photos/list.txt").path)
+        }
+        await settle()
+        check("Extract: a tar.gz and a 7z come out next to them, and they stay",
+              both && fm.fileExists(atPath: tgz.path) && fm.fileExists(atPath: seven.path))
+        check("Extract: the list selects both results", pane.list.selectedItems.map(\.name).sorted() == ["Notes", "Photos"])
+        check("Extract: no hidden work folder stays behind after tar", !names(box).contains { $0.hasPrefix(".luksfer-extract") })
+        let trashedBefore = names(trash).count
+        AppServices.shared.undoManager.undo()
+        let bothUndone = await waitFor(10) {
+            !fm.fileExists(atPath: box.appendingPathComponent("Notes").path)
+                && !fm.fileExists(atPath: box.appendingPathComponent("Photos").path)
+        }
+        await settle()
+        check("Extract: one Undo moves both results to the Trash", bothUndone && names(trash).count == trashedBefore + 2)
         pane.navigate(to: folder)
         await wait()
+    }
+
+    /// Runs macOS's tar to make a test archive. True when it worked.
+    private static func tar(_ arguments: [String]) -> Bool {
+        let process = Process()
+        process.executableURL = ArchiveExtractor.tar
+        process.arguments = arguments
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return false }
+        process.waitUntilExit()
+        return process.terminationStatus == 0
     }
 
     private static func newWindow() async {

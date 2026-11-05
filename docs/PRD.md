@@ -121,7 +121,7 @@ inside the window. It is the app you open for everyday file work instead of Find
 ### 5.5 Context menus
 
 - **On a file:** Open, Open With ▸, Quick Look, Cut, Copy, Copy Path, Rename, Duplicate, Compress,
-  Extract (zip files only), Move to Trash; New folder and New text file *next to this file*; Open in Terminal (inside), Open in
+  Extract (zip, 7z and tar files), Move to Trash; New folder and New text file *next to this file*; Open in Terminal (inside), Open in
   Terminal App; Get Info.
 - **On a folder:** Open, Open in Other Pane, Pin to or Unpin from Favorites, Cut, Copy, Paste Into
   Folder, Copy Path, Rename, Move to Trash; a New ▸ submenu with a folder or text file *inside it* or
@@ -144,10 +144,13 @@ inside the window. It is the app you open for everyday file work instead of Find
 - After an action, the status bar says what it did, with Undo where it can be undone.
 - Long copies show progress in the status bar, can be stopped, and never block the window.
 - Undo (⌘Z) for rename, move, copy, new item and Trash. One Undo undoes one action.
-- Extract puts what is in a zip next to the zip, and the zip stays. One item at the top of the zip
-  comes out as itself; several come out in a folder named after the zip. A taken name gets a number,
-  so nothing is overwritten. A failed extract leaves nothing behind. Undo moves the result to the
-  Trash. A downloaded zip's quarantine mark carries over, so macOS still checks what comes out.
+- Extract puts what is in an archive next to it, and the archive stays. It knows `.zip`, `.7z`,
+  `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz2`, `.tar.xz` and `.txz`, with the tools in macOS
+  (`ditto` for zip, `tar` for the rest). One item at the top of the archive comes out as itself;
+  several come out in a folder named after the archive. A taken name gets a number, so nothing is
+  overwritten. A failed extract leaves nothing behind. Undo moves the result to the Trash. A
+  downloaded archive's quarantine mark carries over, so macOS still checks what comes out. An
+  archive with a password shows an error. RAR and a lone `.gz` file get no Extract.
 - Rename in place with F2 (or Enter with Finder keys).
 
 ### 5.7 Terminal

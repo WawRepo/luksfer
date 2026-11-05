@@ -202,12 +202,13 @@ final class FileActions {
 
     // MARK: Extract
 
-    /// Extracts zip files next to themselves. The zips stay. Undo moves what came out to the Trash.
-    func extract(_ zips: [URL], in window: BrowserWindowController) {
-        guard !zips.isEmpty else { return }
-        window.statusBar.showProgress("Extracting \(Self.describe(zips))", fraction: nil)
+    /// Extracts zip, 7z and tar files next to themselves. The archives stay. Undo moves what came out
+    /// to the Trash.
+    func extract(_ archives: [URL], in window: BrowserWindowController) {
+        guard !archives.isEmpty else { return }
+        window.statusBar.showProgress("Extracting \(Self.describe(archives))", fraction: nil)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let (made, failure) = Self.extractAll(zips)
+            let (made, failure) = Self.extractAll(archives)
             DispatchQueue.main.async {
                 window.statusBar.hideProgress()
                 guard let self else { return }
@@ -219,7 +220,7 @@ final class FileActions {
                     }
                     let folders = Set(made.map { $0.deletingLastPathComponent() })
                     self.reloadPanes(in: window, showing: folders, select: made)
-                    let text = made.count == 1 ? "Extracted to “\(made[0].lastPathComponent)”" : "Extracted \(made.count) zip files"
+                    let text = made.count == 1 ? "Extracted to “\(made[0].lastPathComponent)”" : "Extracted \(made.count) archives"
                     window.statusBar.showMessage(text, undo: self.undoLast)
                 }
                 if let failure { window.showError(failure) }
@@ -228,10 +229,10 @@ final class FileActions {
     }
 
     /// Stops at the first failure. What came out before it stays, and Undo can remove it.
-    private static func extractAll(_ zips: [URL]) -> (made: [URL], failure: Error?) {
+    private static func extractAll(_ archives: [URL]) -> (made: [URL], failure: Error?) {
         var made: [URL] = []
-        for zip in zips {
-            do { made.append(try ZipExtractor.extract(zip)) } catch { return (made, error) }
+        for archive in archives {
+            do { made.append(try ArchiveExtractor.extract(archive)) } catch { return (made, error) }
         }
         return (made, nil)
     }

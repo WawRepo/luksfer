@@ -123,7 +123,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             return !editingText && !selection.isEmpty
         case #selector(extractItems(_:)):
             let items = activePane.list.selectedItems
-            return !editingText && !items.isEmpty && items.allSatisfy(ZipExtractor.canExtract)
+            return !editingText && !items.isEmpty && items.allSatisfy(ArchiveExtractor.canExtract)
         case #selector(paste(_:)), #selector(pasteMove(_:)):
             return !editingText && FileClipboard.hasFiles
         case #selector(pasteInto(_:)):
