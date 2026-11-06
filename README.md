@@ -14,7 +14,7 @@ have my Explorer back.
 I just needed something simple, without feature overload. If you need something more, feel free
 to fork it or [open an issue](../../issues).
 
-**Status:** early (version 0.1). The main features work; expect rough edges.
+**Status:** early (version 0.x). The main features work; expect rough edges.
 
 **Docs:** the guide, every key and an FAQ are at [wawrepo.github.io/luksfer](https://wawrepo.github.io/luksfer/).
 
