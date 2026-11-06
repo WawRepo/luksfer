@@ -1,5 +1,12 @@
 <h1 align="center"><img src="docs/brand/logo.png" alt="Luksfer" width="380"></h1>
 
+<p align="center">
+  <a href="https://github.com/WawRepo/luksfer/releases/latest"><b>Download</b></a> ·
+  <a href="https://wawrepo.github.io/luksfer/"><b>Docs</b></a> ·
+  <a href="https://wawrepo.github.io/luksfer/keys.html">Keys</a> ·
+  <a href="https://wawrepo.github.io/luksfer/faq.html">FAQ</a>
+</p>
+
 Luksfer is a native macOS file explorer that works like Windows Explorer. "Luksfer" is Polish
 for a glass block, the brick that lets light through a wall.
 
@@ -16,7 +23,7 @@ to fork it or [open an issue](../../issues).
 
 **Status:** early (version 0.x). The main features work; expect rough edges.
 
-**Docs:** the guide, every key and an FAQ are at [wawrepo.github.io/luksfer](https://wawrepo.github.io/luksfer/).
+**Docs:** the guide, every key and an FAQ are on the [docs site](https://wawrepo.github.io/luksfer/).
 
 ![Luksfer with two panes: a Projects folder on the left and Downloads on the right](docs/images/two-panes.png)
 
