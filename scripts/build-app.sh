@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Builds Luksfer.app into ~/Library/Caches/luksfer-dev/dist/ (release; pass --debug for a debug build).
 # Start it with: open ~/Library/Caches/luksfer-dev/dist/Luksfer.app
-# LUKSFER_VERSION sets the version (default 0.2.0). LUKSFER_SIGN_IDENTITY picks the signing
+# LUKSFER_VERSION sets the version (default 0.3.0). LUKSFER_SIGN_IDENTITY picks the signing
 # certificate; "-" signs ad hoc. LUKSFER_DIST changes the output folder.
 set -eu
 root="${0:A:h:h}"
@@ -28,7 +28,7 @@ cp "$root/Resources/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"
 # The licenses of the third-party code compiled into the app (SwiftTerm and what it includes).
 cp "$root/THIRD_PARTY_NOTICES.md" "$app/Contents/Resources/THIRD_PARTY_NOTICES.md"
 
-version="${LUKSFER_VERSION:-0.2.0}"
+version="${LUKSFER_VERSION:-0.3.0}"
 build_number=$(git -C "$root" rev-list --count HEAD 2>/dev/null || echo 1)
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
