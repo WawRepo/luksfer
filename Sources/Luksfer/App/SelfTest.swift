@@ -677,7 +677,8 @@ enum SelfTest {
     }
 
     /// Extract on the right-click menu: what is in a zip comes out next to it, Undo takes it back,
-    /// and a damaged zip shows an error and leaves nothing behind. A tar.gz and a 7z come out too.
+    /// and a damaged zip shows an error and leaves nothing behind. Opening a zip extracts it too.
+    /// A tar.gz and a 7z come out too.
     private static func extractZips(in folder: URL, window w: BrowserWindowController) async {
         let pane = w.activePane
         let fm = FileManager.default
@@ -729,6 +730,26 @@ enum SelfTest {
         let undone = await waitFor(10) { !fm.fileExists(atPath: result.path) }
         await settle()
         check("Extract: Undo moves what came out to the Trash", undone && names(trash).count == trashed + 1 && fm.fileExists(atPath: zip.path))
+
+        // Open (Return, double-click, ⌘O) on a zip extracts it here. It does not go to Archive
+        // Utility, which shows the result in a Finder window. Another file still goes to its app.
+        let handedOff = FileOpener.recorded.count
+        pane.list.select([zip], scroll: false)
+        _ = pane.list.fileTable(pane.list.tableView, handle: .open)
+        let opened = await waitFor(10) { fm.fileExists(atPath: result.appendingPathComponent("summary.txt").path) }
+        await settle()
+        check("Extract: opening a zip extracts it in Luksfer and hands nothing to another app",
+              opened && fm.fileExists(atPath: zip.path) && FileOpener.recorded.count == handedOff)
+        check("Extract: opening a zip selects what came out", pane.list.selectedItems.map(\.name) == ["Report"])
+        AppServices.shared.undoManager.undo()
+        let openUndone = await waitFor(10) { !fm.fileExists(atPath: result.path) }
+        await settle()
+        check("Extract: Undo takes back an opened zip", openUndone)
+        pane.list.select([note], scroll: false)
+        w.openSelection(nil)
+        check("Extract: opening another file still hands it to its app",
+              FileOpener.recorded.count == handedOff + 1
+                && FileOpener.recorded.last?.standardizedFileURL == note.standardizedFileURL)
 
         let damaged = box.appendingPathComponent("damaged.zip")
         fm.createFile(atPath: damaged.path, contents: Data("this is not a zip".utf8))

@@ -12,6 +12,7 @@ protocol PaneDelegate: AnyObject {
     func pane(_ pane: PaneViewController, rename item: FileItem, to name: String)
     func pane(_ pane: PaneViewController, drop urls: [URL], into folder: URL, operation: DropOperation) -> Bool
     func pane(_ pane: PaneViewController, didCopyPaths count: Int)
+    func pane(_ pane: PaneViewController, extract archives: [URL])
 }
 
 /// One pane: back, forward and up, the path bar, Copy path, the search box, and the file list.
@@ -511,8 +512,12 @@ extension PaneViewController: FileListDelegate {
             navigate(to: items[0].url)
             return
         }
-        for item in items {
-            if item.isFolder { navigate(to: item.url) } else { NSWorkspace.shared.open(item.url) }
+        // An archive that Extract knows comes out here, like Extract. Its app (Archive Utility)
+        // would show the result in a Finder window.
+        let archives = items.filter(ArchiveExtractor.canExtract)
+        if !archives.isEmpty { delegate?.pane(self, extract: archives.map(\.url)) }
+        for item in items where !ArchiveExtractor.canExtract(item) {
+            if item.isFolder { navigate(to: item.url) } else { FileOpener.open(item.url) }
         }
     }
 

@@ -150,7 +150,10 @@ inside the window. It is the app you open for everyday file work instead of Find
   several come out in a folder named after the archive. A taken name gets a number, so nothing is
   overwritten. A failed extract leaves nothing behind. Undo moves the result to the Trash. A
   downloaded archive's quarantine mark carries over, so macOS still checks what comes out. An
-  archive with a password shows an error. RAR and a lone `.gz` file get no Extract.
+  archive with a password shows an error. RAR and a lone `.gz` file get no Extract. Open
+  (double-click, Enter, ⌘O) on one of these archives extracts it the same way, like a double-click
+  in Finder. It does not hand it to Archive Utility, which shows the result in a Finder window.
+  Open With can still pick Archive Utility.
 - Rename in place with F2 (or Enter with Finder keys).
 
 ### 5.7 Terminal
