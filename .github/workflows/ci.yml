@@ -13,9 +13,17 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-      - name: Use the newest Xcode on the runner
+      # A fixed Xcode, so a new or beta Xcode on the runner cannot change the build. 26.6 (Swift
+      # 6.3) is the newest stable Xcode on macos-26. When GitHub removes it, this step fails and
+      # names the Xcodes that are there: pick the newest stable one.
+      - name: Use Xcode 26.6
         run: |
-          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          xcode=/Applications/Xcode_26.6.app
+          if [[ ! -d "$xcode" ]]; then
+            echo "::error::$xcode is not on this runner. It has: $(cd /Applications && ls -d Xcode_*.app | tr '\n' ' ')"
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode"
           xcodebuild -version
           swift --version
       - name: Unit tests
