@@ -84,6 +84,9 @@ grep selftest "$root/opened.log"
 - `LUKSFER_KEYCHAIN`: a keychain file the app makes, so test passwords never reach your login
   keychain.
 - `LUKSFER_MOUNT_DIR`: where test network drives would mount, instead of `/Volumes`.
+- `LUKSFER_SELFTEST_INACTIVE=1` (optional): the app does not come to the front, so the run does not
+  take the focus from the app you work in. It also checks that the self-test passes with another
+  app in front; steps that need Luksfer in front print `SKIP`.
 
 The Trash, keychain and mount switches count only in a self-test mode (`1`, `restore`, `opened`), and
 each mode quits when it ends. A normal launch ignores them.

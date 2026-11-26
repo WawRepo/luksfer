@@ -26,7 +26,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if states.isEmpty { openWindow(state: nil) } else { states.forEach { openWindow(state: $0) } }
         }
         updateHotKey()
-        if !quietLaunch { NSApp.activate() }
+        // LUKSFER_SELFTEST_INACTIVE=1: the self-test runs with another app in front, as when the user
+        // clicks away during a run.
+        if !quietLaunch && TestSwitches.selfTestOnly("LUKSFER_SELFTEST_INACTIVE") != "1" { NSApp.activate() }
         DevHooks.scheduleSnapshot()
         DevHooks.scheduleBench()
         SelfTest.scheduleIfAsked()
