@@ -26,7 +26,7 @@ changes.
 
 ## Stack
 
-- Swift package, no Xcode project. Swift 6.4 toolchain in Swift 5 language mode. macOS 15 or newer,
+- Swift package, no Xcode project. Swift 6.3 or newer (CI uses Xcode 26.6) in Swift 5 language mode. macOS 15 or newer,
   Apple Silicon.
 - `LuksferCore`: file system logic with no UI, unit tests in `Tests/LuksferCoreTests`.
   `Luksfer`: the AppKit app. `LuksferSpike`: the checks that chose the stack

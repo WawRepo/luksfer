@@ -100,7 +100,7 @@ Needs a Mac with Apple Silicon and macOS 15 or newer.
 
 ## Build from source
 
-You need Xcode with the Swift 6.4 toolchain (Xcode's `actool` also builds the app icon). The
+You need Xcode 26.6 or newer (Swift 6.3 or newer; Xcode's `actool` also builds the app icon). The
 scripts build outside the repo, in `~/Library/Caches/luksfer-dev/`, so a checkout in a synced
 folder stays clean.
 
