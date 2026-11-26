@@ -62,10 +62,10 @@ exit code 1 on a failure. Always give it sandbox folders:
 
 ```sh
 root=~/Library/Caches/luksfer-dev/sandbox/selftest
-rm -rf "$root"; mkdir -p "$root/folder" "$root/trash" "$root/settings" "$root/mnt"
+rm -rf "$root"; mkdir -p "$root/folder" "$root/trash" "$root/settings" "$root/mnt" "$root/zdot"
 app=~/Library/Caches/luksfer-dev/dist/Luksfer.app/Contents/MacOS/Luksfer
 export LUKSFER_TRASH_DIR="$root/trash" LUKSFER_SETTINGS_DIR="$root/settings" \
-       LUKSFER_KEYCHAIN="$root/keychain/test.keychain-db" LUKSFER_MOUNT_DIR="$root/mnt"
+       LUKSFER_KEYCHAIN="$root/keychain/test.keychain-db" LUKSFER_MOUNT_DIR="$root/mnt" ZDOTDIR="$root/zdot"
 LUKSFER_SELFTEST=1 LUKSFER_OPEN="$root/folder" "$app" 2>&1 | grep selftest
 LUKSFER_SELFTEST=restore "$app" 2>&1 | grep selftest   # checks that the window comes back
 # A launch to open a folder (`open -a Luksfer <folder>`) opens only that window. `open` does not pass the
@@ -73,7 +73,7 @@ LUKSFER_SELFTEST=restore "$app" 2>&1 | grep selftest   # checks that the window 
 mkdir -p "$root/opened"
 open -n -W --env LUKSFER_SELFTEST=opened --env LUKSFER_TRASH_DIR="$root/trash" \
      --env LUKSFER_SETTINGS_DIR="$root/settings" --env LUKSFER_KEYCHAIN="$root/keychain/test.keychain-db" \
-     --env LUKSFER_MOUNT_DIR="$root/mnt" --stderr "$root/opened.log" \
+     --env LUKSFER_MOUNT_DIR="$root/mnt" --env ZDOTDIR="$root/zdot" --stderr "$root/opened.log" \
      -a ~/Library/Caches/luksfer-dev/dist/Luksfer.app "$root/opened"
 grep selftest "$root/opened.log"
 ```
@@ -84,6 +84,9 @@ grep selftest "$root/opened.log"
 - `LUKSFER_KEYCHAIN`: a keychain file the app makes, so test passwords never reach your login
   keychain.
 - `LUKSFER_MOUNT_DIR`: where test network drives would mount, instead of `/Volumes`.
+- `ZDOTDIR`: an empty folder, so the terminal checks do not run your own zsh startup files. A
+  question from them (such as an update prompt) stops the first prompt, and the terminal checks
+  fail. A failed terminal check prints the last lines of the terminal screen.
 - `LUKSFER_SELFTEST_INACTIVE=1` (optional): the app does not come to the front, so the run does not
   take the focus from the app you work in. It also checks that the self-test passes with another
   app in front; steps that need Luksfer in front print `SKIP`.

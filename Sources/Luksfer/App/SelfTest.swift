@@ -528,10 +528,20 @@ enum SelfTest {
         await wait()
         w.openTerminal(at: folder, focus: false)
         guard let t = w.terminal else { check("terminal opens", false); return }
-        check("terminal starts in the pane's folder", await waitFor(15) { same(t.currentFolder, folder) && t.isAtIdlePrompt })
+        // A failed check prints the screen: a question from the user's own startup files (an update
+        // prompt) stops the first prompt, and the screen shows it. Use an empty ZDOTDIR for test runs.
+        func checkShell(_ name: String, _ ok: Bool) {
+            check(name, ok)
+            guard !ok else { return }
+            let lines = t.screenText.split(separator: "\n", omittingEmptySubsequences: false)
+                .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.suffix(8)
+            FileHandle.standardError.write(Data("selftest: terminal screen (last \(lines.count) lines):\n".utf8))
+            lines.forEach { FileHandle.standardError.write(Data("selftest: | \($0)\n".utf8)) }
+        }
+        checkShell("terminal starts in the pane's folder", await waitFor(15) { same(t.currentFolder, folder) && t.isAtIdlePrompt })
         if !AppServices.shared.settings.terminalFollow { t.followEnabled = true }
         w.activePane.navigate(to: inner)
-        check("Follow: opening a folder moves the shell", await waitFor(10) { same(t.currentFolder, inner) && t.isAtIdlePrompt })
+        checkShell("Follow: opening a folder moves the shell", await waitFor(10) { same(t.currentFolder, inner) && t.isAtIdlePrompt })
         check("Follow leaves no cd line in the terminal", !t.screenText.contains("cd --") && !t.screenText.isEmpty)
         t.type(" builtin cd -- \(ShellQuoting.singleQuoted(folder.path))\r")
         check("Follow: cd in the shell moves the pane", await waitFor(10) { same(w.activePane.folder, folder) })
