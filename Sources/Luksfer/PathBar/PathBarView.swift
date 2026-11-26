@@ -50,6 +50,11 @@ final class PathBarView: NSView {
     var suggestionTitles: [String] = []
     var highlighted: Int?
     var suggestionGeneration = 0
+    /// Enter checks the typed path off the main thread. A newer Enter, more typing or the end of
+    /// typing makes an older answer stale.
+    var resolveGeneration = 0
+    /// For the self-test: reading a folder for a › menu or Enter takes this long (a slow network folder).
+    static var diskDelayForTests: TimeInterval = 0
     var clickMonitor: Any?
     let suggestionQueue = DispatchQueue(label: "luksfer.pathbar.suggestions", qos: .userInitiated)
 
@@ -158,6 +163,7 @@ final class PathBarView: NSView {
         suggestionTitles = []
         highlighted = nil
         suggestionGeneration += 1
+        resolveGeneration += 1
         popup.close()
         removeClickMonitor()
         if let window, let editor = field.currentEditor(), window.firstResponder === editor {

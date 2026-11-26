@@ -22,7 +22,22 @@ extension PathBarView: NSTextFieldDelegate {
             cancelAndNotify()
             return
         }
-        switch PathResolver.resolve(text, relativeTo: folder, home: home) {
+        // The check reads the disk, which can be slow on a network or cloud folder: off the main thread.
+        resolveGeneration += 1
+        let generation = resolveGeneration
+        let base = folder, home = home, delay = Self.diskDelayForTests
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            if delay > 0 { Thread.sleep(forTimeInterval: delay) }
+            let result = PathResolver.resolve(text, relativeTo: base, home: home)
+            DispatchQueue.main.async {
+                guard let self, self.isEditing, generation == self.resolveGeneration else { return }
+                self.go(to: result)
+            }
+        }
+    }
+
+    private func go(to result: PathInput) {
+        switch result {
         case .folder(let url):
             navigate(to: url, select: nil)
         case .file(let url):
@@ -116,6 +131,7 @@ extension PathBarView: NSTextFieldDelegate {
     /// The text changed by typing, pasting or Tab.
     func userChangedText() {
         hasError = false
+        resolveGeneration += 1  // an Enter still being checked was for the old text
         setHighlight(nil)  // a highlight belongs to the old text; Enter must not pick it
         refreshSuggestions()
     }

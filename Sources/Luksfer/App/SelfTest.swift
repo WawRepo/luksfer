@@ -744,6 +744,37 @@ enum SelfTest {
         await wait()
     }
 
+    /// A slow folder (2 s to read) does not stop the window: the › menu opens at once with
+    /// "Loading…" and fills when the folders are read; Enter returns at once and goes there when
+    /// the path is checked.
+    private static func slowPathBar(in folder: URL, window w: BrowserWindowController) async {
+        let pane = w.activePane
+        let bar = pane.pathBar
+        let target = folder.appendingPathComponent("New folder", isDirectory: true)
+        pane.navigate(to: folder)
+        await wait()
+        PathBarView.diskDelayForTests = 2
+        defer { PathBarView.diskDelayForTests = 0 }
+
+        var start = Date()
+        let menu = bar.folderMenu(for: PathCrumb(title: folder.lastPathComponent, url: folder))
+        let menuTook = Date().timeIntervalSince(start)
+        check("path bar: a slow folder's › menu opens at once with “Loading…”", menuTook < 0.5 && menu.items.map(\.title) == ["Loading…"])
+        let filled = await waitFor(5) { menu.items.contains { $0.title == "New folder" } }
+        check("path bar: the › menu fills when the folders are read", filled && !menu.items.contains { $0.title == "Loading…" })
+
+        bar.beginEditing(text: target.path, selectAll: false)
+        start = Date()
+        bar.goToTypedText()
+        let enterTook = Date().timeIntervalSince(start)
+        let stillHere = pane.folder.standardizedFileURL == folder.standardizedFileURL
+        let went = await waitFor(5) { pane.folder.standardizedFileURL == target.standardizedFileURL }
+        check("path bar: Enter on a slow folder returns at once, then goes there", enterTook < 0.5 && stillHere && went && !bar.isEditing)
+        pane.navigate(to: folder)
+        await wait()
+        pane.list.focus()
+    }
+
     /// The names in a zip file, without folder entries.
     private static func zipEntries(_ zip: URL) -> Set<String> {
         let list = Process(), out = Pipe()
@@ -1128,6 +1159,7 @@ enum SelfTest {
         await compressOddNames(in: folder, window: w)
         await compressFailure(in: folder, window: w)
         await pathHint(in: folder, window: w)
+        await slowPathBar(in: folder, window: w)
         await extractZips(in: folder, window: w)
         await newWindow()
         await comeBack(in: folder, window: w)

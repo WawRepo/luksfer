@@ -12,11 +12,34 @@ extension PathBarView {
         withChevronOpen(button) { button.popUp(menu) }
     }
 
-    /// The › menu: the folders inside `crumb`, in Finder order. Lists names only.
+    /// The › menu: the folders inside `crumb`, in Finder order. Lists names only. They are read
+    /// off the main thread: a slow network or cloud folder shows "Loading…" until they are there.
     func folderMenu(for crumb: PathCrumb) -> NSMenu {
         let menu = NSMenu(title: crumb.title)
         menu.autoenablesItems = false
-        let folders = Subfolders.list(in: crumb.url, includeHidden: showsHiddenFolders)
+        let loading = NSMenuItem(title: "Loading…", action: nil, keyEquivalent: "")
+        loading.isEnabled = false
+        menu.addItem(loading)
+        let read = FolderRead()
+        let url = crumb.url, hidden = showsHiddenFolders, delay = Self.diskDelayForTests
+        read.group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            if delay > 0 { Thread.sleep(forTimeInterval: delay) }
+            read.folders = Subfolders.list(in: url, includeHidden: hidden)
+            read.group.leave()
+        }
+        // A quick folder fills the menu before it opens, so "Loading…" does not flash.
+        if read.group.wait(timeout: .now() + 0.15) == .success {
+            fill(menu, with: read.folders, crumb: crumb)
+        } else {
+            // Also while the menu is open: the main queue runs during menu tracking.
+            read.group.notify(queue: .main) { [weak self] in self?.fill(menu, with: read.folders, crumb: crumb) }
+        }
+        return menu
+    }
+
+    private func fill(_ menu: NSMenu, with folders: [URL], crumb: PathCrumb) {
+        menu.removeAllItems()
         for url in folders.prefix(Self.folderMenuLimit) {
             menu.addItem(folderItem(title: url.lastPathComponent, url: url))
         }
@@ -32,7 +55,6 @@ extension PathBarView {
             empty.isEnabled = false
             menu.addItem(empty)
         }
-        return menu
     }
 
     /// The "…" menu: the crumbs that did not fit, top folder first.
@@ -72,4 +94,10 @@ extension PathBarView {
         guard let url = item.representedObject as? URL else { return }
         beginEditing(text: url.path == "/" ? "/" : url.path + "/", selectAll: false)
     }
+}
+
+/// The folders of one › menu, read on a background queue. `group` says when they are there.
+private final class FolderRead: @unchecked Sendable {
+    let group = DispatchGroup()
+    var folders: [URL] = []
 }
