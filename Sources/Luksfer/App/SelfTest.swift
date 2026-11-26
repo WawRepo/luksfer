@@ -715,6 +715,35 @@ enum SelfTest {
         check("a failed Compress leaves no zip", names(box) == ["one.txt", "two.txt"])
     }
 
+    /// The hint under the path suggestions shows in full, also in a narrow pane (1360 pt window,
+    /// two panes) and in a wide one.
+    private static func pathHint(in folder: URL, window w: BrowserWindowController) async {
+        let frameBefore = w.window?.frame ?? .zero
+        for width: CGFloat in [1360, 1900] {
+            w.window?.setFrame(NSRect(origin: frameBefore.origin, size: NSSize(width: width, height: frameBefore.height)), display: true)
+            await wait(0.3)
+            let bar = w.activePane.pathBar
+            bar.beginEditing(text: folder.path + "/", selectAll: false)
+            bar.refreshSuggestions()
+            let shown = await waitFor(5) { bar.popup.isVisible }
+            bar.popup.content.layoutSubtreeIfNeeded()
+            FileHandle.standardError.write(Data("selftest: INFO path hint at \(Int(width)) pt: \(bar.popup.content.hintLines) line(s), popup \(Int(bar.popup.content.width)) pt\n".utf8))
+            await wait(0.2)
+            let view = bar.popup.content
+            if let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
+                view.cacheDisplay(in: view.bounds, to: rep)
+                try? rep.representation(using: .png, properties: [:])?
+                    .write(to: folder.deletingLastPathComponent().appendingPathComponent("selftest-path-hint-\(Int(width)).png"))
+            }
+            check("path bar: the whole hint shows under the suggestions (\(Int(width)) pt, two panes)",
+                  shown && w.twoPanes && bar.popup.content.hintFits)
+            bar.cancelEditing()
+        }
+        w.window?.setFrame(frameBefore, display: true)
+        w.activePane.list.focus()
+        await wait()
+    }
+
     /// The names in a zip file, without folder entries.
     private static func zipEntries(_ zip: URL) -> Set<String> {
         let list = Process(), out = Pipe()
@@ -1098,6 +1127,7 @@ enum SelfTest {
         await subfolderSearch(in: folder, window: w)
         await compressOddNames(in: folder, window: w)
         await compressFailure(in: folder, window: w)
+        await pathHint(in: folder, window: w)
         await extractZips(in: folder, window: w)
         await newWindow()
         await comeBack(in: folder, window: w)

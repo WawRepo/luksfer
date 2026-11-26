@@ -45,13 +45,20 @@ final class PathPopup {
         present(below: bar)
     }
 
+    /// A narrow pane's path bar is too narrow for the paths and the hint, so the list is at least
+    /// this wide. It stays inside the window: under the right pane it reaches to the left.
+    static let minWidth: CGFloat = 320
+
     private func present(below bar: NSView) {
         guard let window = bar.window else { return }
-        let width = bar.bounds.width
+        let barOnScreen = window.convertToScreen(bar.convert(bar.bounds, to: nil))
+        let inside = window.frame.insetBy(dx: 8, dy: 0)
+        let width = min(max(bar.bounds.width, Self.minWidth), max(bar.bounds.width, inside.width))
+        var x = barOnScreen.minX
+        if x + width > inside.maxX { x = max(inside.minX, inside.maxX - width) }
         content.width = width
         let height = content.fittingHeight
-        let barOnScreen = window.convertToScreen(bar.convert(bar.bounds, to: nil))
-        let frame = NSRect(x: barOnScreen.minX, y: barOnScreen.minY - 3 - height, width: width, height: height)
+        let frame = NSRect(x: x, y: barOnScreen.minY - 3 - height, width: width, height: height)
 
         let panel = self.panel ?? makePanel()
         panel.appearance = window.effectiveAppearance
@@ -90,13 +97,15 @@ final class PathPopupPanel: NSPanel {
 /// The popup's content: rows of folders (or one error line) and the hint line.
 final class PathPopupContentView: NSView {
     static let hint = "Tab completes · Enter goes · Esc cancels · type “term” for a terminal here"
+    /// The hint when one line does not fit: two lines, split at a dot.
+    static let hintTwoLines = "Tab completes · Enter goes · Esc cancels\nType “term” for a terminal here"
     static let rowHeight: CGFloat = 26
     static let padding: CGFloat = 4
     static let footerHeight: CGFloat = 24
 
     var onPick: ((Int) -> Void)?
     var onHover: ((Int) -> Void)?
-    var width: CGFloat = 300
+    var width: CGFloat = 300 { didSet { fitFooter() } }
 
     var highlighted: Int? {
         didSet { rows.enumerated().forEach { $0.element.isHighlighted = $0.offset == highlighted } }
@@ -111,8 +120,10 @@ final class PathPopupContentView: NSView {
         super.init(frame: frame)
         footer.font = .systemFont(ofSize: 11.5)
         footer.textColor = .secondaryLabelColor
-        footer.lineBreakMode = .byTruncatingTail
+        footer.lineBreakMode = .byWordWrapping
+        footer.maximumNumberOfLines = 0
         errorRow.isHidden = true
+        fitFooter()
         addSubview(footer)
         addSubview(errorRow)
         setAccessibilityRole(.list)
@@ -152,7 +163,34 @@ final class PathPopupContentView: NSView {
 
     var fittingHeight: CGFloat {
         let body = showsError ? Self.rowHeight + 4 : CGFloat(rows.count) * Self.rowHeight
-        return Self.padding + body + Self.footerHeight + Self.padding / 2
+        return Self.padding + body + footerBoxHeight + Self.padding / 2
+    }
+
+    /// The hint's text width: the popup's width less the padding on both sides.
+    private var footerWidth: CGFloat { max(0, width - 2 * Self.padding - 16) }
+    private var footerTextHeight: CGFloat = 14
+    private var footerBoxHeight: CGFloat { max(Self.footerHeight, footerTextHeight + 10) }
+
+    /// The hint on one line when it fits, else on two (a narrow pane), so no part is cut off.
+    private func fitFooter() {
+        let oneLine = (Self.hint as NSString).size(withAttributes: [.font: footer.font ?? .systemFont(ofSize: 11.5)]).width
+        footer.stringValue = oneLine <= footerWidth ? Self.hint : Self.hintTwoLines
+        footer.preferredMaxLayoutWidth = footerWidth
+        footerTextHeight = ceil(footer.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: footerWidth, height: 1000)).height ?? 14)
+    }
+
+    /// For the self-test: how many lines the hint uses.
+    var hintLines: Int { footer.stringValue.split(separator: "\n").count }
+
+    /// For the self-test: the whole hint shows, nothing is cut off.
+    var hintFits: Bool {
+        guard let cell = footer.cell, footer.frame.width > 0 else { return false }
+        let needed = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: footer.frame.width, height: 1000))
+        let longest = footer.stringValue.split(separator: "\n").map {
+            (String($0) as NSString).size(withAttributes: [.font: footer.font ?? .systemFont(ofSize: 11.5)]).width
+        }.max() ?? 0
+        return needed.height <= footer.frame.height + 0.5 && longest <= footer.frame.width
+            && footer.frame.maxY <= bounds.height
     }
 
     override func layout() {
@@ -169,9 +207,9 @@ final class PathPopupContentView: NSView {
             row.frame = NSRect(x: inner.minX, y: y, width: inner.width, height: Self.rowHeight)
             y += Self.rowHeight
         }
-        let footerY = y + (Self.footerHeight - footer.intrinsicContentSize.height) / 2 + 1
+        let footerY = y + (footerBoxHeight - footerTextHeight) / 2 + 1
         footer.frame = NSRect(x: inner.minX + 8, y: footerY, width: max(0, inner.width - 16),
-                              height: footer.intrinsicContentSize.height)
+                              height: footerTextHeight)
         separatorY = y + 0.5
     }
 
