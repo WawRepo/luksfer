@@ -100,6 +100,20 @@ enum SelfTest {
         check("search: the Folder column is never saved", !AppServices.shared.settings.columns.contains { $0.id == FileColumn.folder.rawValue })
         check("search: a sort by name still marks the Name column", FileColumn(sortKey: .name) == .name)
 
+        // Compress on results from two folders: one zip in the searched folder, with the subfolder paths.
+        pane.list.select([top, deep], scroll: false)
+        w.compressItems(nil)
+        let zip = box.appendingPathComponent("Archive.zip")
+        let zipped = await waitFor(10) { fm.fileExists(atPath: zip.path) }
+        await settle()
+        check("search: Compress on results from two folders makes one zip in the searched folder", zipped
+              && zipEntries(zip) == ["needle-top.txt", "deep/inner/needle-deep.txt"]
+              && w.statusBar.message == "Compressed to “Archive.zip” in “search-box”")
+        AppServices.shared.undoManager.undo()
+        await settle()
+        check("search: undo of Compress takes the zip away", !fm.fileExists(atPath: zip.path)
+              && shown() == ["needle-top.txt", "needle-deep.txt"] && pane.list.isShowingResults)
+
         guard let found = pane.list.items.first(where: { $0.name == "needle-deep.txt" }) else { return }
         w.pane(pane, rename: found, to: renamed.lastPathComponent)
         await settle()
@@ -676,6 +690,44 @@ enum SelfTest {
               made && !names(box).contains("marker"))
     }
 
+    /// A Compress that cannot write its zip says why, with one item (ditto) and several (zip), and
+    /// leaves no zip behind.
+    private static func compressFailure(in folder: URL, window w: BrowserWindowController) async {
+        let fm = FileManager.default
+        let box = folder.appendingPathComponent("read-only", isDirectory: true)
+        try? fm.createDirectory(at: box, withIntermediateDirectories: true)
+        let items = ["one.txt", "two.txt"].map { box.appendingPathComponent($0) }
+        items.forEach { fm.createFile(atPath: $0.path, contents: Data("text".utf8)) }
+        chmod(box.path, 0o555)
+        defer { chmod(box.path, 0o755) }
+
+        func failure(_ urls: [URL]) async -> String {
+            FileActions.shared.compress(urls, in: w)
+            _ = await waitFor(10) { w.window?.attachedSheet != nil }
+            let text = w.window?.attachedSheet.map { sheetText($0.contentView) } ?? ""
+            return await answer("OK", on: w.window) ? text : ""
+        }
+        let several = await failure(items)
+        check("a failed Compress of several items says why", several.contains("Luksfer could not make “Archive.zip”. Could not create output file"))
+        let one = await failure([items[0]])
+        check("a failed Compress of one item says why", one.contains("Luksfer could not make “one.zip”.") && one.contains("Permission denied"))
+        await settle()
+        check("a failed Compress leaves no zip", names(box) == ["one.txt", "two.txt"])
+    }
+
+    /// The names in a zip file, without folder entries.
+    private static func zipEntries(_ zip: URL) -> Set<String> {
+        let list = Process(), out = Pipe()
+        list.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        list.arguments = ["-Z1", zip.path]
+        list.standardOutput = out
+        list.standardError = FileHandle.nullDevice
+        guard (try? list.run()) != nil else { return [] }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        list.waitUntilExit()
+        return Set(String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init).filter { !$0.hasSuffix("/") })
+    }
+
     /// Extract on the right-click menu: what is in a zip comes out next to it, Undo takes it back,
     /// and a damaged zip shows an error and leaves nothing behind. Opening a zip extracts it too.
     /// A tar.gz and a 7z come out too.
@@ -1045,6 +1097,7 @@ enum SelfTest {
         await drops(in: folder, window: w)
         await subfolderSearch(in: folder, window: w)
         await compressOddNames(in: folder, window: w)
+        await compressFailure(in: folder, window: w)
         await extractZips(in: folder, window: w)
         await newWindow()
         await comeBack(in: folder, window: w)

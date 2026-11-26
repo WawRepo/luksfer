@@ -167,11 +167,15 @@ final class FileActions {
     // MARK: Compress
 
     /// Zips the items next to them with `ditto` (like Finder's Compress). Undo moves the zip to the Trash.
+    /// Makes a zip of `urls`. Items from several folders (search results) go into the folder that
+    /// holds them all, with their subfolder paths. A failure shows the reason.
     func compress(_ urls: [URL], in window: BrowserWindowController) {
-        guard let folder = urls.first?.deletingLastPathComponent() else { return }
+        guard let plan = ZipCommand.plan(urls) else { return }
+        let folder = plan.folder
         let base = urls.count == 1 ? urls[0].deletingPathExtension().lastPathComponent : "Archive"
         let name = FileOperationEngine.uniqueName("\(base).zip", in: folder, style: .numbered)
         let zip = folder.appendingPathComponent(name)
+        let oneFolder = Set(urls.map { $0.deletingLastPathComponent().standardizedFileURL.path }).count == 1
         window.statusBar.showProgress("Compressing \(Self.describe(urls))", fraction: nil)
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let p = Process()
@@ -179,23 +183,38 @@ final class FileActions {
                 p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
                 p.arguments = ["-c", "-k", "--sequesterRsrc", "--keepParent", urls[0].path, zip.path]
             } else {
-                // Several items: zip them by name from their folder.
                 p.executableURL = ZipCommand.executable
                 p.currentDirectoryURL = folder
-                p.arguments = ZipCommand.arguments(zip: zip.path, names: urls.map(\.lastPathComponent))
+                p.arguments = ZipCommand.arguments(zip: zip.path, names: plan.paths)
             }
-            try? p.run()
-            p.waitUntilExit()
+            let output = Pipe()
+            p.standardOutput = output
+            p.standardError = output
+            var failure: Error?
+            do {
+                try p.run()
+                let text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                p.waitUntilExit()
+                if p.terminationStatus != 0 {
+                    failure = CompressError.failed(zip: name, reason: ZipCommand.reason(output: text, status: p.terminationStatus))
+                }
+            } catch {
+                failure = CompressError.failed(zip: name, reason: error.localizedDescription)
+            }
+            // A failed run can leave a half-made zip. The name was free before, so it is not a user's file.
+            if failure != nil { try? FileManager.default.removeItem(at: zip) }
             DispatchQueue.main.async {
                 window.statusBar.hideProgress()
-                guard let self, p.terminationStatus == 0 else { NSSound.beep(); return }
+                if let failure { window.showError(failure); return }
+                guard let self else { return }
                 self.registerStep("Compress") { target in
                     Task { @MainActor in
                         do { _ = try await target.engine.trash([zip]) } catch { window.showError(error) }
                     }
                 }
                 self.reloadPanes(in: window, showing: [folder], select: [zip])
-                window.statusBar.showMessage("Compressed to “\(zip.lastPathComponent)”", undo: self.undoLast)
+                let place = oneFolder ? "" : " in “\(folder.lastPathComponent)”"
+                window.statusBar.showMessage("Compressed to “\(name)”\(place)", undo: self.undoLast)
             }
         }
     }

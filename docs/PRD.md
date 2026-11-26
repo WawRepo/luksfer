@@ -144,6 +144,9 @@ inside the window. It is the app you open for everyday file work instead of Find
 - After an action, the status bar says what it did, with Undo where it can be undone.
 - Long copies show progress in the status bar, can be stopped, and never block the window.
 - Undo (⌘Z) for rename, move, copy, new item and Trash. One Undo undoes one action.
+- Compress makes a zip next to the selected items. Search results from several folders go into
+  one zip in the folder that holds them all, with their subfolder paths. A failed Compress says
+  why and leaves no zip behind.
 - Extract puts what is in an archive next to it, and the archive stays. It knows `.zip`, `.7z`,
   `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz2`, `.tar.xz` and `.txz`, with the tools in macOS
   (`ditto` for zip, `tar` for the rest). One item at the top of the archive comes out as itself;
