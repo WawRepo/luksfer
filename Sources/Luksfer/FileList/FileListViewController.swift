@@ -281,11 +281,15 @@ final class FileListViewController: NSViewController {
         }
     }
 
+    /// Sorts the rows again, for example after Settings › Folders on top changed.
+    func resort() { applyItems(keepSelection: true) }
+
     private func applyItems(keepSelection: Bool) {
         defer { delegate?.fileListItemsDidChange(self) }
         guard renaming == nil else { return }
         let selected = keepSelection ? selectedURLs : []
-        items = FileSorter.sort(ListFilter.filter(allItems, query: filterQuery), by: sortOrder)
+        items = FileSorter.sort(ListFilter.filter(allItems, query: filterQuery), by: sortOrder,
+                                foldersFirst: AppServices.shared.settings.foldersFirst)
         tableView.reloadData()
         if !selected.isEmpty { select(selected, scroll: false) }
         delegate?.fileListSelectionDidChange(self)

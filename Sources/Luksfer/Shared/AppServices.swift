@@ -26,6 +26,7 @@ final class AppServices {
         let before = store.settings
         store.update(change)
         if before.favorites != store.settings.favorites || before.showHidden != store.settings.showHidden
+            || before.foldersFirst != store.settings.foldersFirst
             || before.keyMode != store.settings.keyMode || before.terminalApp != store.settings.terminalApp
             || before.networkDrives != store.settings.networkDrives {
             NotificationCenter.default.post(name: .luksferSettingsChanged, object: nil)

@@ -390,13 +390,7 @@ enum SelfTest {
         check("search box filters the list", pane.list.items.map(\.name) == ["notes.md"])
         pane.list.filterQuery = ""
 
-        let byName = pane.list.items.map(\.name)
-        pane.list.sortOrder = FileSortOrder(key: .name, ascending: false)
-        let reversed = pane.list.items.map(\.name)
-        let firstFolder = pane.list.items.firstIndex(where: \.isFolder) ?? 0
-        check("Z to A puts files first and folders last (like Explorer)", firstFolder > 0
-              && pane.list.items[firstFolder...].allSatisfy(\.isFolder) && reversed != byName)
-        pane.list.sortOrder = FileSortOrder()
+        await sorting(in: folder, pane: pane)
 
         FileManager.default.createFile(atPath: folder.appendingPathComponent(".secret").path, contents: nil)
         pane.reload()
@@ -930,6 +924,48 @@ enum SelfTest {
         return process.terminationStatus == 0
     }
 
+    /// Folders and files sort as one list; Settings › Folders on top groups them like Explorer.
+    private static func sorting(in folder: URL, pane: PaneViewController) async {
+        let fm = FileManager.default
+        let first = folder.appendingPathComponent("aa sort check.txt")
+        fm.createFile(atPath: first.path, contents: nil)
+        let later = Date().addingTimeInterval(120)
+        try? fm.setAttributes([.modificationDate: later], ofItemAtPath: folder.appendingPathComponent("New folder").path)
+        try? fm.setAttributes([.modificationDate: later.addingTimeInterval(-3600)], ofItemAtPath: first.path)
+        pane.reload()
+        await wait()
+        func names() -> [String] { pane.list.items.map(\.name) }
+        func index(_ name: String) -> Int { names().firstIndex(of: name) ?? -1 }
+        AppServices.shared.update { $0.foldersFirst = false }
+        await wait()
+
+        pane.list.sortOrder = FileSortOrder()
+        check("A to Z sorts folders and files together", index("aa sort check.txt") >= 0
+              && index("aa sort check.txt") < index("New folder"))
+        pane.list.sortOrder = FileSortOrder(key: .modified, ascending: false)
+        check("newest first puts a new folder above an older file", index("New folder") == 0
+              && index("aa sort check.txt") > 0)
+
+        AppServices.shared.update { $0.foldersFirst = true }
+        await wait()
+        let grouped = pane.list.items
+        let firstFolder = grouped.firstIndex(where: \.isFolder) ?? 0
+        check("Folders on top: newest first puts folders last (like Explorer)", firstFolder > 0
+              && grouped[firstFolder...].allSatisfy(\.isFolder))
+        pane.list.sortOrder = FileSortOrder()
+        let lastFolder = pane.list.items.lastIndex(where: \.isFolder) ?? -1
+        check("Folders on top: A to Z puts folders first", lastFolder >= 0
+              && pane.list.items[...lastFolder].allSatisfy(\.isFolder) && index("New folder") < index("aa sort check.txt"))
+
+        AppServices.shared.update { $0.foldersFirst = false }
+        await wait()
+        check("turning Folders on top off sorts them together again", index("aa sort check.txt") >= 0
+              && index("aa sort check.txt") < index("New folder"))
+        try? fm.removeItem(at: first)
+        pane.reload()
+        await wait()
+    }
+
     private static func newWindow() async {
         let before = NSApp.windows.filter { $0.windowController is BrowserWindowController }.count
         (NSApp.delegate as? AppDelegate)?.newWindow(nil)
@@ -1018,6 +1054,9 @@ enum SelfTest {
         let expected = FileManager.default.fileExists(atPath: downloads.path) ? downloads : home
         check("⌥⌘Space opens a new single-pane window in Downloads", opened.count == 1 && !opened[0].twoPanes
               && opened[0].activePane.folder.standardizedFileURL.path == expected.standardizedFileURL.path)
+        check("a new window in Downloads sorts by Date modified, newest first", opened.count == 1
+              && opened[0].activePane.list.sortOrder == FileSortOrder.newWindow(in: expected, downloads: downloads)
+              && (expected != downloads || opened[0].activePane.list.sortOrder == FileSortOrder(key: .modified, ascending: false)))
         opened.forEach { $0.window?.close() }
         w.window?.makeKeyAndOrderFront(nil)
         await wait()

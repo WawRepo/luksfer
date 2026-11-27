@@ -34,16 +34,60 @@ final class ListingTests: XCTestCase {
         XCTAssertThrowsError(try DirectoryReader.read(box.root.appendingPathComponent("nope"), includeHidden: false))
     }
 
-    func testSortPutsFoldersFirstAscendingAndLastDescending() throws {
+    func testFoldersFirstPutsFoldersFirstAscendingAndLastDescending() throws {
         let box = CoreSandbox()
         for n in ["file 10.txt", "file 2.txt", "B.txt", "a.txt"] { box.file(n) }
         box.folder("zeta")
         box.folder("Alpha")
         let items = try DirectoryReader.read(box.root, includeHidden: false)
-        let names = FileSorter.sort(items, by: FileSortOrder(key: .name, ascending: true)).map(\.name)
+        let names = FileSorter.sort(items, by: FileSortOrder(key: .name, ascending: true), foldersFirst: true).map(\.name)
         XCTAssertEqual(names, ["Alpha", "zeta", "a.txt", "B.txt", "file 2.txt", "file 10.txt"])
-        let down = FileSorter.sort(items, by: FileSortOrder(key: .name, ascending: false)).map(\.name)
+        let down = FileSorter.sort(items, by: FileSortOrder(key: .name, ascending: false), foldersFirst: true).map(\.name)
         XCTAssertEqual(down, ["file 10.txt", "file 2.txt", "B.txt", "a.txt", "zeta", "Alpha"])
+    }
+
+    func testFoldersAndFilesSortTogetherByName() throws {
+        let box = CoreSandbox()
+        for n in ["file 10.txt", "file 2.txt", "B.txt", "a.txt"] { box.file(n) }
+        box.folder("zeta")
+        box.folder("Alpha")
+        box.folder("file 3")
+        let items = try DirectoryReader.read(box.root, includeHidden: false)
+        let names = FileSorter.sort(items, by: FileSortOrder(key: .name, ascending: true), foldersFirst: false).map(\.name)
+        XCTAssertEqual(names, ["a.txt", "Alpha", "B.txt", "file 2.txt", "file 3", "file 10.txt", "zeta"])
+        let down = FileSorter.sort(items, by: FileSortOrder(key: .name, ascending: false), foldersFirst: false).map(\.name)
+        XCTAssertEqual(down, Array(names.reversed()))
+    }
+
+    /// Downloads newest first: a folder that came in after a file is above it, and an older folder
+    /// below it. Equal dates go by name.
+    func testFoldersAndFilesSortTogetherByDate() throws {
+        let box = CoreSandbox()
+        let base = Date(timeIntervalSince1970: 1_800_000_000)
+        let dated: [(String, Bool, TimeInterval)] = [("old.zip", false, 0), ("old folder", true, 10), ("mid.pdf", false, 20),
+                                                       ("new folder", true, 30), ("new.dmg", false, 40), ("same b.txt", false, 50),
+                                                       ("same a", true, 50)]
+        for (name, isFolder, offset) in dated {
+            let url = isFolder ? box.folder(name) : box.file(name)
+            try FileManager.default.setAttributes([.modificationDate: base.addingTimeInterval(offset)], ofItemAtPath: url.path)
+        }
+        let items = try DirectoryReader.read(box.root, includeHidden: false)
+        let newest = FileSorter.sort(items, by: FileSortOrder(key: .modified, ascending: false), foldersFirst: false).map(\.name)
+        XCTAssertEqual(newest, ["same b.txt", "same a", "new.dmg", "new folder", "mid.pdf", "old folder", "old.zip"])
+        let oldest = FileSorter.sort(items, by: FileSortOrder(key: .modified, ascending: true), foldersFirst: false).map(\.name)
+        XCTAssertEqual(oldest, ["old.zip", "old folder", "mid.pdf", "new folder", "new.dmg", "same a", "same b.txt"])
+        let grouped = FileSorter.sort(items, by: FileSortOrder(key: .modified, ascending: false), foldersFirst: true).map(\.name)
+        XCTAssertEqual(grouped, ["same b.txt", "new.dmg", "mid.pdf", "old.zip", "same a", "new folder", "old folder"])
+    }
+
+    func testNewWindowSortsDownloadsNewestFirst() {
+        let downloads = URL(fileURLWithPath: "/w/home/Downloads", isDirectory: true)
+        XCTAssertEqual(FileSortOrder.newWindow(in: URL(fileURLWithPath: "/w/home/Downloads/", isDirectory: true), downloads: downloads),
+                       FileSortOrder(key: .modified, ascending: false))
+        XCTAssertEqual(FileSortOrder.newWindow(in: URL(fileURLWithPath: "/w/home/Documents", isDirectory: true), downloads: downloads),
+                       FileSortOrder(key: .name, ascending: true))
+        XCTAssertEqual(FileSortOrder.newWindow(in: URL(fileURLWithPath: "/w/home/Downloads/sub", isDirectory: true), downloads: downloads),
+                       FileSortOrder(key: .name, ascending: true))
     }
 
     func testSortBySizeTurnsFoldersAroundToo() throws {
@@ -52,8 +96,11 @@ final class ListingTests: XCTestCase {
         box.file("small.txt", "x")
         box.folder("dir")
         let items = try DirectoryReader.read(box.root, includeHidden: false)
-        XCTAssertEqual(FileSorter.sort(items, by: FileSortOrder(key: .size, ascending: false)).map(\.name), ["big.txt", "small.txt", "dir"])
-        XCTAssertEqual(FileSorter.sort(items, by: FileSortOrder(key: .size, ascending: true)).map(\.name), ["dir", "small.txt", "big.txt"])
+        // A folder has no size, so a sort by size keeps folders apart even when they sort with files.
+        for foldersFirst in [true, false] {
+            XCTAssertEqual(FileSorter.sort(items, by: FileSortOrder(key: .size, ascending: false), foldersFirst: foldersFirst).map(\.name), ["big.txt", "small.txt", "dir"])
+            XCTAssertEqual(FileSorter.sort(items, by: FileSortOrder(key: .size, ascending: true), foldersFirst: foldersFirst).map(\.name), ["dir", "small.txt", "big.txt"])
+        }
     }
 
     func testTypeNames() throws {

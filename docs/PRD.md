@@ -79,8 +79,11 @@ inside the window. It is the app you open for everyday file work instead of Find
 
 - Columns: Name, Date modified, Type and Size. Date created and Extension can be turned on. Columns
   can be resized, moved and hidden.
-- Click a column header to sort. Like Explorer, folders come first in an ascending sort and last in
-  a descending one.
+- Click a column header to sort. Folders and files sort together as one list (a folder has no size,
+  so a sort by size keeps folders apart). Settings › Folders on top sorts like Explorer instead:
+  folders first in an ascending sort and last in a descending one.
+- A new window that opens in Downloads sorts by Date modified, newest first. Other folders start
+  sorted by name; a restored window keeps its sort.
 - Details is the default for every folder. *(planned)* A pane can switch to Icons, with thumbnails.
 - File extensions always show. Hidden files are off by default; ⇧⌘. (the Finder key) shows them, and
   Luksfer remembers the choice.

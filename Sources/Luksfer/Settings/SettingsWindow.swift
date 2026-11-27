@@ -7,6 +7,7 @@ import SwiftUI
 struct SettingsView: View {
     @State private var keyMode = AppServices.shared.settings.keyMode
     @State private var showHidden = AppServices.shared.settings.showHidden
+    @State private var foldersFirst = AppServices.shared.settings.foldersFirst
     @State private var follow = AppServices.shared.settings.terminalFollow
     @State private var terminalApp = TerminalApp(rawValue: AppServices.shared.settings.terminalApp) ?? .terminal
     @State private var hotKey = AppServices.shared.settings.newWindowHotKey
@@ -24,6 +25,12 @@ struct SettingsView: View {
             .onChange(of: keyMode) { _, v in AppServices.shared.update { $0.keyMode = v } }
             Toggle("Show hidden files", isOn: $showHidden)
                 .onChange(of: showHidden) { _, v in AppServices.shared.update { $0.showHidden = v } }
+            Toggle("Folders on top", isOn: $foldersFirst)
+                .onChange(of: foldersFirst) { _, v in AppServices.shared.update { $0.foldersFirst = v } }
+            Text("Like Explorer: folders come first in an ascending sort and last in a descending one. Off: folders and files sort together.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Section("New window from any app") {
                 Toggle("⌥⌘Space opens a new window in Downloads", isOn: $hotKey)
                     .onChange(of: hotKey) { _, v in

@@ -43,7 +43,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             var start = i < paneStates.count ? URL(fileURLWithPath: paneStates[i].path, isDirectory: true) : downloads
             if i == 0, let folder { start = folder }
             if !FileManager.default.fileExists(atPath: start.path) { start = home }
-            let pane = PaneViewController(folder: start, sort: i < paneStates.count ? paneStates[i].sort : FileSortOrder())
+            let sort = i < paneStates.count ? paneStates[i].sort : FileSortOrder.newWindow(in: start, downloads: downloads)
+            let pane = PaneViewController(folder: start, sort: sort)
             pane.delegate = self
             panes.append(pane)
         }
@@ -331,16 +332,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private var lastShowHidden: Bool?
+    private var lastFoldersFirst: Bool?
 
     @objc private func settingsChanged() {
         let hidden = AppServices.shared.settings.showHidden
         if lastShowHidden != nil && lastShowHidden != hidden { panes.forEach { $0.reload() } }
         lastShowHidden = hidden
+        let foldersFirst = AppServices.shared.settings.foldersFirst
+        if lastFoldersFirst != nil && lastFoldersFirst != foldersFirst { panes.forEach { $0.list.resort() } }
+        lastFoldersFirst = foldersFirst
         applyKeyMode()
     }
 
     private func applyKeyMode() {
         lastShowHidden = lastShowHidden ?? AppServices.shared.settings.showHidden
+        lastFoldersFirst = lastFoldersFirst ?? AppServices.shared.settings.foldersFirst
         let finder = AppServices.shared.settings.keyMode == .finder
         panes.forEach { $0.list.tableView.enterRenames = finder }
     }

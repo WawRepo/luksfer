@@ -53,6 +53,9 @@ public struct WindowState: Codable, Equatable, Sendable {
 public struct AppSettings: Codable, Equatable, Sendable {
     public var favorites: [Favorite] = []
     public var showHidden = false
+    /// Folders before files in an ascending sort, after them in a descending one (Explorer). Off:
+    /// folders and files sort together as one list.
+    public var foldersFirst = false
     public var keyMode: KeyMode = .windows
     public var terminalApp = "terminal"
     public var terminalFollow = true
@@ -81,6 +84,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         favorites = try c.decodeIfPresent([Favorite].self, forKey: .favorites) ?? []
         showHidden = try c.decodeIfPresent(Bool.self, forKey: .showHidden) ?? false
+        foldersFirst = try c.decodeIfPresent(Bool.self, forKey: .foldersFirst) ?? false
         keyMode = try c.decodeIfPresent(KeyMode.self, forKey: .keyMode) ?? .windows
         terminalApp = try c.decodeIfPresent(String.self, forKey: .terminalApp) ?? "terminal"
         terminalFollow = try c.decodeIfPresent(Bool.self, forKey: .terminalFollow) ?? true
